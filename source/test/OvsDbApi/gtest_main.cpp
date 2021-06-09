@@ -27,7 +27,7 @@ extern "C" {
 #include "common/OvsAgentLog.h"
 }
 
-#define GTEST_REPORT_FILEPATH   "/tmp/OvsDbApi_gtest_report.xml"
+#define GTEST_REPORT_FILEPATH   "/tmp/Gtest_Report/OvsDbApi_gtest_report.xml"
 #define GTEST_REPORT_FILEPATH_SIZE 128
 
 class OvsDbApiEnvironment : public ::testing::Environment

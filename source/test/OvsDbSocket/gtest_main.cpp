@@ -23,7 +23,7 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
-#define GTEST_REPORT_FILEPATH      "/tmp/OvsDbSocket_gtest_report.xml"
+#define GTEST_REPORT_FILEPATH      "/tmp/Gtest_Report/OvsDbSocket_gtest_report.xml"
 #define GTEST_REPORT_FILEPATH_SIZE 128
 
 class OvsDbSocketEnvironment : public ::testing::Environment
