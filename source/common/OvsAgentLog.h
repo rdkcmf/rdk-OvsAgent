@@ -43,4 +43,9 @@
 #define OvsDbApiWarning(...)     LOG(LOG_WARNING_LEVEL, "DB", __VA_ARGS__)
 #define OvsDbApiDebug(...)       LOG(LOG_DEBUG_LEVEL, "DB" , __VA_ARGS__)
 
+#define OvsAgentSspError(...)    LOG(LOG_ERROR_LEVEL, "SSP", __VA_ARGS__)
+#define OvsAgentSspInfo(...)     LOG(LOG_INFO_LEVEL, "SSP", __VA_ARGS__)
+#define OvsAgentSspWarning(...)  LOG(LOG_WARNING_LEVEL, "SSP", __VA_ARGS__)
+#define OvsAgentSspDebug(...)    LOG(LOG_DEBUG_LEVEL, "SSP" , __VA_ARGS__)
+
 #endif

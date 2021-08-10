@@ -28,6 +28,7 @@ bin_PROGRAMS = OvsAgent
 OvsAgent_CPPFLAGS = -I$(top_srcdir)/source -I$(top_srcdir)/source/include $(CPPFLAGS)
 OvsAgent_SOURCES = OvsAgentMain.c OvsAgent.c OvsAgentLog.c
 OvsAgent_LDADD = ${top_builddir}/source/OvsAgentApi/libOvsAgentApi.la
+OvsAgent_LDADD += ${top_builddir}/source/OvsAgentSsp/libOvsAgentSsp.la
 OvsAgent_LDADD += ${top_builddir}/source/OvsAction/libOvsAction.la
 OvsAgent_CFLAGS = $(SYSTEMD_CFLAGS)
 OvsAgent_CFLAGS += "-DFEATURE_SUPPORT_RDKLOG"

@@ -23,6 +23,7 @@
 #include "test/mocks/mock_utils.h"
 #include "test/mocks/mock_file_io.h"
 #include "test/mocks/mock_syscfg.h"
+#include "test/mocks/mock_cosa_api.h"
 
 extern "C" {
 #include "OvsAction/ovs_action.h"
@@ -37,24 +38,28 @@ using ::testing::StrEq;
 UtilsMock * g_utilsMock = NULL;  /* This is the actual definition of the mock obj */
 FileIOMock * g_fileIOMock = NULL;
 SyscfgMock * g_syscfgMock = NULL;
+CosaMock * g_cosaMock = NULL;
 
 class OvsActionTestFixture : public ::testing::Test {
     protected:
         UtilsMock mockedUtils;
         FileIOMock mockedFileIO;
         SyscfgMock mockedSyscfg;
+        CosaMock mockedCosa;
 
         OvsActionTestFixture()
         {
             g_utilsMock = &mockedUtils;
             g_fileIOMock = &mockedFileIO;
             g_syscfgMock = &mockedSyscfg;
+            g_cosaMock = &mockedCosa;
         }
         virtual ~OvsActionTestFixture()
         {
             g_utilsMock = NULL;
             g_fileIOMock = NULL;
             g_syscfgMock = NULL;
+            g_cosaMock = NULL;
         }
 
         virtual void SetUp()
@@ -463,7 +468,17 @@ class ModelNumBasedTestFixture :
 {
 };
 
-// Fix for TCXB6-9125 and ARRISXB6-12373
+ACTION_P(SetCosaGetParamValuesArg4, value)
+{
+    *static_cast<int*>(arg4) = value;
+}
+
+ACTION_P(SetCosaGetParamValuesArg5, value)
+{
+    *static_cast<parameterValStruct_t***>(arg5) = *value;
+}
+
+// Fix for TCXB6-9125, ARRISXB6-12373, and TCXB6-9721
 TEST_P(ModelNumBasedTestFixture, ovs_action_add_http_llan0_port_in_bridge_mode)
 {
     const OVS_IF_TYPE ifType = OVS_OTHER_IF_TYPE;
@@ -471,6 +486,10 @@ TEST_P(ModelNumBasedTestFixture, ovs_action_add_http_llan0_port_in_bridge_mode)
     const std::string ifName = "llan0";
     const std::string parentBridge = "brlan0";
     const char expectedIP[] = "10.0.0.1";
+    char expectedCMIP[] = "2001:558:4000:a0:82d0:4aff:fed1:faad";
+    char expectedParamName[] = "Device.DeviceInfo.X_COMCAST-COM_CM_IP";
+    char expectedDestComponentName[] = "eRT.com.cisco.spvtg.ccsp.pam";
+    char expectedDestComponentPath[] = "/com/cisco/spvtg/ccsp/pam";
     FILE * expectedFd1 = (FILE *)0xffffffff;
     FILE * expectedFd2 = (FILE *)0xfffffffe;
     FILE * expectedFd3 = (FILE *)0xfffffffd;
@@ -481,6 +500,12 @@ TEST_P(ModelNumBasedTestFixture, ovs_action_add_http_llan0_port_in_bridge_mode)
     char expectedBridgePorts[] = "llan0\n";
     char expectedMacAddress[] = "12:34:56:78:90:AB";
     char * expectedModel = GetParam();
+    const int expectedParamSize = 1;
+
+    parameterValStruct_t **pExpectedParamValues = new parameterValStruct_t*[expectedParamSize];
+    pExpectedParamValues[0] = new parameterValStruct_t;
+    pExpectedParamValues[0]->parameterName = expectedParamName;
+    pExpectedParamValues[0]->parameterValue = &expectedCMIP[0];
 
     std::vector<std::string> expectedCmds;
     expectedCmds.push_back("ifconfig " + ifName + " up");
@@ -493,6 +518,10 @@ TEST_P(ModelNumBasedTestFixture, ovs_action_add_http_llan0_port_in_bridge_mode)
         expectedIP  + "/32,actions=mod_dl_dst:" + expectedMacAddress + ",output:" + ifName);
     expectedCmds.push_back("ovs-ofctl add-flow " + parentBridge + " ip,nw_dst=" +
         expectedIP  + "/32,actions=mod_dl_dst:" + expectedMacAddress + ",output:" + ifName);
+    expectedCmds.push_back("ovs-ofctl --strict del-flows " + parentBridge +
+        " ipv6,ipv6_dst=" + expectedCMIP + "/128");
+    expectedCmds.push_back("ovs-ofctl add-flow " + parentBridge + " ipv6,ipv6_dst=" +
+        expectedCMIP  + "/128,actions=drop");
 
     Gateway_Config cfg = {0};
     cfg.if_type = ifType;
@@ -564,8 +593,29 @@ TEST_P(ModelNumBasedTestFixture, ovs_action_add_http_llan0_port_in_bridge_mode)
             ::testing::Return(0)
         ));
 
+    EXPECT_CALL(*g_cosaMock, Cosa_FindDestComp(StrEq(expectedParamName), _, _))
+        .Times(1)
+        .WillOnce(::testing::DoAll(
+            ::testing::SetArgPointee<1>(expectedDestComponentName),
+            ::testing::SetArgPointee<2>(expectedDestComponentPath),
+            ::testing::Return(true)
+        ));
+    EXPECT_CALL(*g_cosaMock, Cosa_GetParamValues(_, _, _, _, _, _))
+        .Times(1)
+        .WillOnce(::testing::DoAll(
+            SetCosaGetParamValuesArg4(expectedParamSize),
+            SetCosaGetParamValuesArg5(&pExpectedParamValues),
+            ::testing::Return(true)
+        ));
+    EXPECT_CALL(*g_cosaMock, Cosa_FreeParamValues(_, _))
+        .Times(1)
+        .WillOnce(Return());
+
     EXPECT_EQ(OVS_SUCCESS_STATUS, ovs_action_init());
     EXPECT_EQ(OVS_SUCCESS_STATUS, ovs_action_gateway_config(&cfg));
+
+    delete pExpectedParamValues[0];
+    delete[] pExpectedParamValues;
 }
 
 INSTANTIATE_TEST_SUITE_P(AddHttpLlan0PortInBridgeModeOvsActionTests, ModelNumBasedTestFixture,

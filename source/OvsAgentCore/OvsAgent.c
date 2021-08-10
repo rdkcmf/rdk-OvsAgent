@@ -24,6 +24,7 @@
 #include "OvsAction/ovs_action.h"
 #include "OvsAgentCore/OvsAgentLog.h"
 #include "OvsAgentCore/OvsAgent.h"
+#include "OvsAgentSsp/cosa_api.h"
 
 static void gwconf_mon_cb(OVS_STATUS status, Rdkb_Table_Config * table_config)
 {
@@ -74,6 +75,8 @@ bool OvsAgentDeinit()
     bool rtn = true;
     OvsAgentInfo("Ovs Agent de-initializing...\n");
 
+    Cosa_Shutdown();
+
     /* De-initialize OvsAgentApi*/
     if (!ovs_agent_api_deinit())
     {
@@ -103,11 +106,19 @@ bool OvsAgentInit()
     }
     OvsAgentInfo("Ovs Agent Log Initialized\n");
 
+    if (!Cosa_Init())
+    {
+        OvsAgentError("Failed to initialize Ovs Agent Cosa Api!\n");
+        return false;
+    }
+    OvsAgentInfo("Ovs Agent Cosa Api Initialized\n");
+
     /* Initialize OvsAgentApi*/
     if (!ovs_agent_api_init(OVS_AGENT_COMPONENT_ID))
     {
         OvsAgentError("Ovs Agent API Init failed for Component Id %d!\n",
             OVS_AGENT_COMPONENT_ID);
+        Cosa_Shutdown();
         (void)OvsAgentLogDeinit();
         return false;
     }
@@ -119,6 +130,7 @@ bool OvsAgentInit()
     {
         OvsAgentError("Failed to initialize Ovs Action!\n");
         (void)ovs_agent_api_deinit();
+        Cosa_Shutdown();
         (void)OvsAgentLogDeinit();
         return false;
     }
@@ -132,6 +144,7 @@ bool OvsAgentInit()
         OvsAgentError("Ovs Agent interact monitor table %d failed!\n",
             request.table_config.table.id);
         (void)ovs_agent_api_deinit();
+        Cosa_Shutdown();
         (void)OvsAgentLogDeinit();
         return false;
     }

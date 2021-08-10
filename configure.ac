@@ -70,6 +70,7 @@ PKG_CHECK_MODULES([DBUS],[dbus-1 >= 1.6.18])
 AC_CONFIG_FILES(
     Makefile
     source/Makefile
+    source/OvsAgentSsp/Makefile
     source/OvsAgentCore/Makefile
     source/OvsDbApi/Makefile
     source/OvsAction/Makefile

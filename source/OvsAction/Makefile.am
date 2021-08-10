@@ -27,4 +27,5 @@ lib_LTLIBRARIES = libOvsAction.la
 
 libOvsAction_la_CPPFLAGS = -I$(top_srcdir)/source/include -I$(top_srcdir)/source $(CPPFLAGS)
 libOvsAction_la_SOURCES = ../common/log.c ovs_action.c syscfg.c
+libOvsAction_la_LIBADD = ${top_builddir}/source/OvsAgentSsp/libOvsAgentSsp.la
 libOvsAction_la_LDFLAGS = -ldl -rdynamic $(SYSTEMD_LDFLAGS) -lsyscfg -lpthread -lz -lrt

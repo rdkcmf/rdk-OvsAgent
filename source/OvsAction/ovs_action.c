@@ -23,6 +23,7 @@
 #include "common/OvsAgentLog.h"
 #include "OvsAction/ovs_action.h"
 #include "OvsAction/syscfg.h"
+#include "OvsAgentSsp/cosa_api.h"
 
 #define MIN_IP_ADDR_STR_LEN 7  // 4+3
 #define MAX_IP_ADDR_STR_LEN 15 // 12+3
@@ -315,6 +316,102 @@ static OVS_STATUS ovs_setup_admin_gui_access(Gateway_Config * req)
     return OVS_SUCCESS_STATUS;
 }
 
+static bool GetCosaParamValues(char **paramNames, const int numParams,
+    int * paramSize, parameterValStruct_t ***paramValues)
+{
+    char *componentName = NULL;
+    char *componentPath = NULL;
+
+    if (!paramNames || !paramSize | (numParams < 1))
+    {
+        return false;
+    }
+
+    OvsActionDebug("%s: Ovs Action Cosa Api Get Param '%s', numParams=%d\n",
+        __func__, paramNames[0], numParams);
+
+    if (!Cosa_FindDestComp(paramNames[0], &componentName, &componentPath) ||
+        !componentName || !componentPath)
+    {
+        OvsActionError("Failed to find Dest CCSP component supporting '%s'!\n",
+            paramNames[0]);
+        return false;
+    }
+    OvsActionDebug(
+        "%s: Ovs Action Cosa Api Found Dest CCSP component %s, Path: %s\n",
+        __func__, componentName, componentPath);
+
+    if (!Cosa_GetParamValues(componentName, componentPath, paramNames,
+            numParams, paramSize, paramValues) ||
+        (*paramSize != numParams) || !(*paramValues)[0])
+    {
+        OvsActionError(
+            "Ovs Action Cosa Api Get Param Values failed for '%s' (size=%d)!\n",
+            paramNames[0], *paramSize);
+        Cosa_FreeParamValues(*paramSize, *paramValues);
+        return false;
+    }
+    OvsActionDebug("%s: Ovs Action Cosa Api Get Param size=%d, %s=%s, len=%zu\n",
+        __func__, *paramSize, ((*paramValues)[0])->parameterName,
+        ((*paramValues)[0])->parameterValue,
+        strlen(((*paramValues)[0])->parameterValue));
+    return true;
+}
+
+// TCHXB6-9721 Fix to block MSO UI access from LAN clients in bridge mode.
+static OVS_STATUS ovs_block_mso_ui_access(Gateway_Config * req)
+{
+    char *paramNames[] = {"Device.DeviceInfo.X_COMCAST-COM_CM_IP"};
+    const int numParams = (int)(sizeof(paramNames)/sizeof(*paramNames));
+    parameterValStruct_t **paramValues = NULL;
+    int paramSize = 0;
+    char cmd[250] = {0};
+    size_t paramValueLen = 0;
+
+    if (!req)
+    {
+        return OVS_FAILED_STATUS;
+    }
+
+    if (!GetCosaParamValues(paramNames, numParams, &paramSize, &paramValues) ||
+        !paramValues[0]->parameterValue)
+    {
+        OvsActionError("%s Ovs Action CCSP Get Param Values failed.\n", __func__);
+        return OVS_FAILED_STATUS;
+    }
+
+    paramValueLen = strlen(paramValues[0]->parameterValue);
+    if (paramValueLen == 0)
+    {
+        OvsActionError("%s failed due to empty Get Param Value length.\n",
+        __func__);
+        return OVS_FAILED_STATUS;
+    }
+    OvsActionDebug("%s: Ovs Action Cosa Api Get Param size=%d, %s=%s, len=%zu\n",
+        __func__, paramSize, paramValues[0]->parameterName,
+        paramValues[0]->parameterValue, paramValueLen);
+
+    snprintf(cmd, 250, "ovs-ofctl --strict del-flows %s ipv6,ipv6_dst=%s/128",
+        req->parent_bridge, paramValues[0]->parameterValue);
+    OvsActionDebug("%s Cmd: %s\n", __func__, cmd);
+    system(cmd);
+
+    if (req->if_cmd != OVS_BR_REMOVE_CMD)
+    {
+        memset(cmd, 0, sizeof (cmd));
+        snprintf(cmd, 250,
+            "ovs-ofctl add-flow %s ipv6,ipv6_dst=%s/128,actions=drop",
+            req->parent_bridge, paramValues[0]->parameterValue);
+        OvsActionDebug("%s Cmd: %s\n", __func__, cmd);
+        system(cmd);
+    }
+
+    // Free the parameter values
+    Cosa_FreeParamValues(paramSize, paramValues);
+
+    return OVS_SUCCESS_STATUS;
+}
+
 OVS_STATUS getExistingOvsParentBridge(Gateway_Config * req,
     char * existing_bridge, size_t size, bool * found)
 {
@@ -482,7 +579,7 @@ OVS_STATUS removeExistingInterfacePort(Gateway_Config * req, bool ovs_enabled)
         return status;
     }
 
-    /* remove the port from its exissting bridge */
+    /* remove the port from its existing bridge */
     memset(cmd, 0, sizeof (cmd));
     if (ovs_enabled)
     {
@@ -804,9 +901,15 @@ static OVS_STATUS ovs_addPort(Gateway_Config * req)
         {
             if ((status = ovs_setup_admin_gui_access(req)) != OVS_SUCCESS_STATUS)
             {
-                OvsActionError("%s failed to setup flows for Bridge %s, Port %s.\n",
+                OvsActionError(
+                    "%s failed to setup Admin GUI access flows for Bridge %s, Port %s.\n",
                     __func__, req->parent_bridge, req->if_name);
-                return status;
+            }
+            if ((status = ovs_block_mso_ui_access(req)) != OVS_SUCCESS_STATUS)
+            {
+                OvsActionError(
+                    "%s failed to block MSO UI access flows for Bridge %s, Port %s.\n",
+                    __func__, req->parent_bridge, req->if_name);
             }
         }
     }

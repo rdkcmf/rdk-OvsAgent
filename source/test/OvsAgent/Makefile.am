@@ -27,11 +27,18 @@ ACLOCAL_AMFLAGS = -I m4
 hardware_platform = i686-linux-gnu
 
 bin_PROGRAMS = OvsAgent_gtest.bin
-OvsAgent_gtest_bin_CPPFLAGS = -I$(PKG_CONFIG_SYSROOT_DIR)$(includedir)/gtest -I${top_srcdir}/gtest/include -I${top_srcdir}/source -I${top_srcdir}/source/include
+OvsAgent_gtest_bin_CPPFLAGS = -I$(PKG_CONFIG_SYSROOT_DIR)$(includedir)/gtest \
+                              -I${top_srcdir}/gtest/include \
+                              -I${top_srcdir}/source \
+                              -I${top_srcdir}/source/include \
+                              -I$(PKG_CONFIG_SYSROOT_DIR)$(includedir)/dbus-1.0 \
+                              -I$(PKG_CONFIG_SYSROOT_DIR)$(libdir)/dbus-1.0/include \
+                              -I$(PKG_CONFIG_SYSROOT_DIR)$(includedir)/ccsp
 OvsAgent_gtest_bin_SOURCES = ../../common/log.c \
                              ../mocks/mock_utils.cpp \
                              ../mocks/mock_syscfg.cpp \
                              ../mocks/mock_file_io.cpp \
+                             ../mocks/mock_cosa_api.cpp \
                              OvsActionTest.cpp \
                              gtest_main.cpp
 OvsAgent_gtest_bin_LDADD = ${top_builddir}/source/OvsAction/libOvsAction.la

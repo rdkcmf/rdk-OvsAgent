@@ -23,6 +23,10 @@ JSON_PARSER_API_LIBS = -L. -lgmock -lgtest -lpthread -lOvsDbApi -ljansson
 AGENT_API_LIBS = -L. -lgmock -lgtest -lpthread -lOvsAgentApi
 AGENT_LIBS = -L. -lgmock -lgtest -lpthread -lOvsAction
 INCLUDE = -I../include -I..
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Darwin)
+INCLUDE += -I../test/include/ccsp
+endif
 CFLAGS = -g -fPIC -fno-builtin -c --coverage
 CXXFLAGS = -g -fPIC -fno-builtin --coverage -std=c++11
 
@@ -101,7 +105,7 @@ $(AGENT_API_TEST_APP): libOvsAgentApi.a $(OVS_AGENT_API_TEST_SRC)
 	$(CPP) $(CXXFLAGS) $(INCLUDE) ../test/mocks/MockOvsDbApi.cpp $(OVS_AGENT_API_TEST_SRC) -o $(AGENT_API_TEST_APP) $(AGENT_API_LIBS)
 
 $(AGENT_TEST_APP): libOvsAction.a $(OVS_AGENT_TEST_SRC)
-	$(CPP) $(CXXFLAGS) $(INCLUDE) ../test/mocks/mock_utils.cpp ../test/mocks/mock_file_io.cpp ../test/mocks/mock_syscfg.cpp \
+	$(CPP) $(CXXFLAGS) $(INCLUDE) ../test/mocks/mock_utils.cpp ../test/mocks/mock_file_io.cpp ../test/mocks/mock_syscfg.cpp ../test/mocks/mock_cosa_api.cpp \
 	$(OVS_AGENT_TEST_SRC) -o $(AGENT_TEST_APP) $(AGENT_LIBS)
 
 clean:
