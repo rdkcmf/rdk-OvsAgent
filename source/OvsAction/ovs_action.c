@@ -241,6 +241,7 @@ static OVS_STATUS ovs_setup_gre_offloading(Gateway_Config * req)
     return OVS_SUCCESS_STATUS;
 }
 
+// Fix for TCXB6-9125, ARRISXB6-12373, TCXB7-4051 and TCXB8-473
 static OVS_STATUS ovs_setup_admin_gui_access(Gateway_Config * req)
 {
     char cmd[250] = {0};
@@ -359,6 +360,7 @@ static bool GetCosaParamValues(char **paramNames, const int numParams,
 }
 
 // TCHXB6-9721 Fix to block MSO UI access from LAN clients in bridge mode.
+// Fix for TCXB7-4051 and TCXB8-473
 static OVS_STATUS ovs_block_mso_ui_access(Gateway_Config * req)
 {
     char *paramNames[] = {"Device.DeviceInfo.X_COMCAST-COM_CM_IP"};
@@ -895,7 +897,9 @@ static OVS_STATUS ovs_addPort(Gateway_Config * req)
 
         // sets up OpenFlow flows for brlan0's llan0 interface port
         if (((g_ovsActionConfig.modelNum == OVS_CGM4140COM_MODEL) ||
-            (g_ovsActionConfig.modelNum == OVS_TG3482G_MODEL)) &&
+            (g_ovsActionConfig.modelNum == OVS_TG3482G_MODEL) ||
+            (g_ovsActionConfig.modelNum == OVS_CGM4331COM_MODEL) ||
+            (g_ovsActionConfig.modelNum == OVS_CGM4981COM_MODEL)) &&
             (strcmp(req->parent_bridge, "brlan0") == 0) &&
             (strcmp(req->if_name, LLAN0_ETH_NAME) == 0))
         {

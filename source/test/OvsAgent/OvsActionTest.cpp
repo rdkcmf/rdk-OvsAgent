@@ -478,7 +478,7 @@ ACTION_P(SetCosaGetParamValuesArg5, value)
     *static_cast<parameterValStruct_t***>(arg5) = *value;
 }
 
-// Fix for TCXB6-9125, ARRISXB6-12373, and TCXB6-9721
+// Fix for TCXB6-9125, ARRISXB6-12373, TCXB6-9721, TCXB7-4051, TCXB8-473
 TEST_P(ModelNumBasedTestFixture, ovs_action_add_http_llan0_port_in_bridge_mode)
 {
     const OVS_IF_TYPE ifType = OVS_OTHER_IF_TYPE;
@@ -619,7 +619,8 @@ TEST_P(ModelNumBasedTestFixture, ovs_action_add_http_llan0_port_in_bridge_mode)
 }
 
 INSTANTIATE_TEST_SUITE_P(AddHttpLlan0PortInBridgeModeOvsActionTests, ModelNumBasedTestFixture,
-    ::testing::Values((char*)"CGM4140COM", (char*)"TG3482G"));
+    ::testing::Values((char*)"CGM4140COM", (char*)"TG3482G",
+                      (char*)"CGM4331COM", (char*)"CGM4981COM"));
 
 // TODO: Add unit tests for the other two cases for RDKB-35124
 // parent - br1
