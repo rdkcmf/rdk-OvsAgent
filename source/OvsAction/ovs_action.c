@@ -60,7 +60,7 @@ static bool SetModelNum(const char * model_num, ovs_action_config * config)
     }
     else if (strcmp(model_num, "CGM4331COM") == 0)
     {
-        config->modelNum = OVS_CGM4981COM_MODEL;
+        config->modelNum = OVS_CGM4331COM_MODEL;
         rtn = true;
     }
     else if (strcmp(model_num, "SR300") == 0)
