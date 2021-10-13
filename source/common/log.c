@@ -65,7 +65,9 @@ bool open_log(const char * path, const char * name)
         return false;
     }
 
-    if ((g_logger->fd = open(path, O_CREAT | O_WRONLY | O_APPEND)) < 0)
+    // RDKB-3832 0644 user permissions mode
+    if ((g_logger->fd = open(path, O_CREAT | O_WRONLY | O_APPEND,
+                             S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) < 0)
     {
         perror("Error: Cannot open output log file.");
         free(g_logger);
