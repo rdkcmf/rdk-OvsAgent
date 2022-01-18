@@ -118,10 +118,11 @@ typedef enum ovs_device_model
   OVS_TG3482G_MODEL, /**< Arris XB6. */
   OVS_CGM4981COM_MODEL, /** Technicolor XB8. */
   OVS_CGM4331COM_MODEL, /** Technicolor XB7. */
-  OVS_SR300_MODEL,       /** Sky Ada SR300. */
-  OVS_SE501_MODEL,      /** Sky Ashelene SE501 */
-  OVS_SR203_MODEL,      /** Sky HUB4 SR203 */
-  OVS_SR213_MODEL       /** Sky Sharman SR213. */
+  OVS_SR213_MODEL,       /** Sky Sharman SR213. */
+  OVS_SR300_MODEL,      /** Sky Ada SR300. */
+  OVS_SE501_MODEL,      /** Sky Ashelene SE501. */
+  OVS_WNXL11BWL_MODEL,  /** Sky/Comcast XLE WNXL11BWL */
+  OVS_SR203_MODEL,      /** Sky HUB4 SR203. */
 } OVS_DEVICE_MODEL;
 
 #endif /* OVS_DATA_TYPES_H_ */
