@@ -32,6 +32,8 @@
 #define PUMA7_ETH2_NAME "nsgmii1.101"
 #define PUMA7_ETH1_PATH "/sys/class/net/nsgmii1.100"
 #define PUMA7_ETH2_PATH "/sys/class/net/nsgmii1.101"
+#define PUMA7_PORT1_NAME "eth_0"
+#define PUMA7_PORT2_NAME "eth_1"
 
 #define LINUX_INTERFACE_PREFIX "INTERFACE="
 #define LINUX_BRPORT_POSTFIX_PATH "/brport/bridge/uevent"

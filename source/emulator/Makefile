@@ -27,8 +27,18 @@ UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
 INCLUDE += -I../test/include/ccsp
 endif
+
 CFLAGS = -g -fPIC -fno-builtin -c --coverage
+ifeq ($(UNAME_S),Darwin)
+CFLAGS +=-DOVS_AGENT_API_LOG_FILE=\""/var/tmp/OvsAgentApiTest.log\""
+CFLAGS +=-DOVSAGENT_DEBUG_ENABLE=\""/var/tmp/enable_ovs_debug\""
+endif
+
 CXXFLAGS = -g -fPIC -fno-builtin --coverage -std=c++11
+ifeq ($(UNAME_S),Darwin)
+CXXFLAGS +=-DOVS_AGENT_API_LOG_FILE=\""/var/tmp/OvsAgentApiTest.log\""
+CXXFLAGS +=-DOVSAGENT_DEBUG_ENABLE=\""/var/tmp/enable_ovs_debug\""
+endif
 
 DB_API_TEST_APP = OvsDbApi_gtest.bin
 AGENT_API_TEST_APP = OvsAgentApi_gtest.bin

@@ -21,7 +21,13 @@
 
 #define OVSAGENT_COMPONENT_NAME  "OvsAgent"
 #define OVSAGENT_SYSCFG_NAME     "mesh_ovs_enable"
+
+#ifndef OVSAGENT_DEBUG_ENABLE
 #define OVSAGENT_DEBUG_ENABLE    "/nvram/enable_ovs_debug"
+#endif
+
+#ifndef OVSAGENT_INIT_FILE
 #define OVSAGENT_INIT_FILE       "/tmp/ovsagent_initialized"
+#endif
 
 #endif

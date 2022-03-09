@@ -36,6 +36,9 @@ typedef struct ovs_action_config
 
 static ovs_action_config g_ovsActionConfig = {0};
 
+static OVS_STATUS getExistingOvsParentBridge(char * if_name,
+    char * existing_bridge, size_t size, bool * found);
+
 static bool SetModelNum(const char * model_num, ovs_action_config * config)
 {
     bool rtn = false;
@@ -91,53 +94,160 @@ static bool SetModelNum(const char * model_num, ovs_action_config * config)
     return rtn;
 }
 
-//WAR: Intel Puma7 Switch hal has a dependency in using the brctl to bringup
+static char * getVlanFromInterfaceName(const char *ifname)
+{
+    const char delimiter = '.';
+    char *vlan = NULL;
+    vlan = strchr(ifname, delimiter);
+    if (!vlan || *(vlan+1)=='\0')
+    {
+        return NULL;
+    }
+    vlan += 1;
+    return vlan;
+}
+
+static OVS_STATUS ovs_runEthSwitchCmds(int count, const char **vlans,
+    const char **ports, const char **ifnames, const char **ifpaths)
+{
+    char cmd[250] = {0};
+    int idx = 0;
+
+    if ((count <= 0) || !vlans || !ports || !ifnames || !ifpaths)
+    {
+        return OVS_FAILED_STATUS;
+    }
+
+    OvsActionDebug("%s Count %d\n", __func__, count);
+
+    for (idx=0; idx<count; idx++)
+    {
+        memset(cmd, 0, sizeof (cmd));
+        snprintf(cmd, 250, "/bin/vlan_util add_group dummy%s %s",
+            vlans[idx], vlans[idx]);
+        OvsActionDebug("%s Cmd: %s\n", __func__, cmd);
+        system(cmd);
+    }
+
+    for (idx=0; idx<count; idx++)
+    {
+        memset(cmd, 0, sizeof (cmd));
+        snprintf(cmd, 250, "/bin/vlan_util add_interface dummy%s %s",
+            vlans[idx], ports[idx]);
+        OvsActionDebug("%s Cmd: %s\n", __func__, cmd);
+        system(cmd);
+    }
+
+    for (idx=0; idx<count; idx++)
+    {
+        memset(cmd, 0, sizeof (cmd));
+        snprintf(cmd, 250, "brctl delif dummy%s %s", vlans[idx], ifnames[idx]);
+        OvsActionDebug("%s Cmd: %s\n", __func__, cmd);
+        system(cmd);
+    }
+
+    for (idx=0; idx<count; idx++)
+    {
+        memset(cmd, 0, sizeof (cmd));
+        snprintf(cmd, 250, "ifconfig dummy%s down; brctl delbr dummy%s",
+            vlans[idx], vlans[idx]);
+        OvsActionDebug("%s Cmd: %s\n", __func__, cmd);
+        system(cmd);
+    }
+
+    for (idx=0; idx<count; idx++)
+    {
+        if ((access(ifpaths[idx], F_OK) == 0))
+        {
+            OvsActionDebug("%s: Ethernet Port %s exists at %s\n", __func__,
+                ifnames[idx], ifpaths[idx]);
+        }
+        else
+        {
+            OvsActionWarning("%s: Ethernet Port %s doesn't exist at %s\n", __func__,
+                ifnames[idx], ifpaths[idx]);
+        }
+    }
+
+    return OVS_SUCCESS_STATUS;
+}
+
+//WAR: Intel Puma7 Switch hal has a dependency in using the brctl to bring up
 //the interfaces. As a temporary solution intermediate create dummy Linux bridge
 //create ethernet ports using the dummy bridge and move it to required OVS bridge later
 //TODO: Temporary solution, long term plan is to accomodate the brcompact ARRISXB6-12186
 //TODO: Add unit tests
-
+// Also provides a fix for ARRISXB6-12678
 static OVS_STATUS ovs_setupEthSwitch(const char *ifname)
 {
-    char cmd[250] = {0};
-    char ethpath[64] = {0};
-
-    OvsActionDebug("%s Special handling of eth switch port %s\n",
-        __func__, ifname);
+    const int MAX_COUNT = 2;
+    int count = 0;
+    const char *vlans[MAX_COUNT];
+    const char *ports[MAX_COUNT];
+    const char *ifnames[MAX_COUNT];
+    const char *ifpaths[MAX_COUNT];
+    char existingBridge[32] = {0};
+    bool found = false;
+    OVS_STATUS status = OVS_SUCCESS_STATUS;
 
     if (!ifname)
     {
         return OVS_FAILED_STATUS;
     }
-    strcpy(ethpath, (strcmp(ifname, PUMA7_ETH1_NAME) == 0) ?
-        PUMA7_ETH1_PATH : PUMA7_ETH2_PATH);
 
-    OvsActionDebug("%s Cmd: /bin/vlan_util add_group dummy 100\n", __func__);
-    system("/bin/vlan_util add_group dummy 100");
+    OvsActionDebug("%s Special handling of eth switch port %s.\n",
+        __func__, ifname);
 
-    OvsActionDebug("%s Cmd: /bin/vlan_util add_interface dummy eth_0\n", __func__);
-    system("/bin/vlan_util add_interface dummy eth_0");
-
-    OvsActionDebug("%s Cmd: /bin/vlan_util add_interface dummy eth_1\n", __func__);
-    system("/bin/vlan_util add_interface dummy eth_1");
-
-    memset(cmd, 0, sizeof (cmd));
-    snprintf(cmd, 250, "brctl delif dummy %s", ifname);
-    OvsActionDebug("%s Cmd: %s\n", __func__, cmd);
-    system(cmd);
-
-    OvsActionDebug("%s Cmd: ifconfig dummy down; brctl delbr dummy\n", __func__);
-    system("ifconfig dummy down; brctl delbr dummy");
-
-    if ((access(ethpath, F_OK) == 0))
+    if (strcmp(ifname, PUMA7_ETH1_NAME) == 0)
     {
-       OvsActionDebug("%s: Ethernet Port %s exists\n", __func__, ifname);
+        ports[count] = PUMA7_PORT1_NAME;
+        ifnames[count] = PUMA7_ETH1_NAME;
+        ifpaths[count] = PUMA7_ETH1_PATH;
+    }
+    else if (strcmp(ifname, PUMA7_ETH2_NAME) == 0)
+    {
+        if ((status = getExistingOvsParentBridge(PUMA7_ETH1_NAME, existingBridge,
+            sizeof(existingBridge), &found)) != OVS_SUCCESS_STATUS)
+        {
+            return status;
+        }
+        if (found && (strcmp(existingBridge, "brlan0") == 0) && count < MAX_COUNT)
+        {   // If nsgmii1.100 existed before, perform a strange work-around
+            // that adds both nsgmii1.100 and nsgmii1.101 simultaneously
+            // so that both their interfaces are created. See ARRISXB6-12678.
+            vlans[count] = getVlanFromInterfaceName(PUMA7_ETH1_NAME);
+            if (!vlans[count])
+            {
+                return OVS_FAILED_STATUS;
+            }
+            ports[count] = PUMA7_PORT1_NAME;
+            ifnames[count] = PUMA7_ETH1_NAME;
+            ifpaths[count] = PUMA7_ETH1_PATH;
+            OvsActionDebug("%s additional Interface: %s, Vlan: %s\n", __func__,
+                ifnames[count], vlans[count]);
+            count++;
+        }
+        ports[count] = PUMA7_PORT2_NAME;
+        ifnames[count] = PUMA7_ETH2_NAME;
+        ifpaths[count] = PUMA7_ETH2_PATH;
     }
     else
     {
-       OvsActionDebug("%s: Ethernet Port %s doesn't exist\n", __func__, ifname);
+        return OVS_SUCCESS_STATUS;
     }
-    return OVS_SUCCESS_STATUS;
+
+    if (count < MAX_COUNT)
+    {
+        vlans[count] = getVlanFromInterfaceName(ifname);
+        if (!vlans[count])
+        {
+            return OVS_FAILED_STATUS;
+        }
+        OvsActionDebug("%s Interface: %s, Vlan: %s\n", __func__,
+            ifnames[count], vlans[count]);
+        count++;
+    }
+    return ovs_runEthSwitchCmds(count, vlans, ports, ifnames, ifpaths);
 }
 
 // TODO: Uses syscfg to get the IP Address for lan0 interface.
@@ -333,7 +443,7 @@ static OVS_STATUS ovs_block_mso_ui_access(Gateway_Config * req)
     return OVS_SUCCESS_STATUS;
 }
 
-OVS_STATUS getExistingOvsParentBridge(Gateway_Config * req,
+static OVS_STATUS getExistingOvsParentBridge(char * if_name,
     char * existing_bridge, size_t size, bool * found)
 {
     size_t len = 0;
@@ -342,13 +452,13 @@ OVS_STATUS getExistingOvsParentBridge(Gateway_Config * req,
     FILE *fp = NULL;
     const char * ovsBridgeNotFoundPrefix = "ovs-vsctl:";
 
-    if (!existing_bridge || !found || (size == 0))
+    if (!if_name || !existing_bridge || !found || (size == 0))
     {
         return OVS_FAILED_STATUS;
     }
     *found = false;
 
-    snprintf(cmd, 250, "ovs-vsctl iface-to-br %s", req->if_name);
+    snprintf(cmd, 250, "ovs-vsctl iface-to-br %s", if_name);
     OvsActionDebug("%s Cmd: %s\n", __func__, cmd);
     fp = popen(cmd, "r");
     if (!fp)
@@ -373,32 +483,31 @@ OVS_STATUS getExistingOvsParentBridge(Gateway_Config * req,
         (strncmp(ovsBridgeNotFoundPrefix, existing_bridge,
             strlen(ovsBridgeNotFoundPrefix)) != 0))
     {
-        OvsActionDebug("%s found existing bridge=%s, len=%zu\n",
-            __func__, existing_bridge, strlen(existing_bridge));
+        OvsActionDebug("%s found existing bridge=%s, len=%zu for %s\n",
+            __func__, existing_bridge, strlen(existing_bridge), if_name);
         *found = true;
     }
     return OVS_SUCCESS_STATUS;
 }
 
-OVS_STATUS getExistingLinuxParentBridge(Gateway_Config * req,
+static OVS_STATUS getExistingLinuxParentBridge(char * if_name,
     char * existing_bridge, size_t size, bool * found)
 {
     size_t len = 0;
     char cmd[250] = {0};
     char line[64] = {0};
-    //char ports[128] = {0};
     FILE *fp = NULL;
     char ifpath[128] = {0};
     const char * linuxBridgeFoundPrefix = LINUX_INTERFACE_PREFIX;
     char * bridge = NULL;
 
-    if (!existing_bridge || !found || (size == 0))
+    if (!if_name || !existing_bridge || !found || (size == 0))
     {
         return OVS_FAILED_STATUS;
     }
     *found = false;
 
-    snprintf(ifpath, 128, "%s/%s%s", SYS_CLASS_NET_PATH, req->if_name, LINUX_BRPORT_POSTFIX_PATH);
+    snprintf(ifpath, 128, "%s/%s%s", SYS_CLASS_NET_PATH, if_name, LINUX_BRPORT_POSTFIX_PATH);
     if ((access(ifpath, F_OK) != 0))
     {
        OvsActionDebug("%s: Interface Port path %s doesn't exist\n", __func__, ifpath);
@@ -416,8 +525,8 @@ OVS_STATUS getExistingLinuxParentBridge(Gateway_Config * req,
     {
         if ((bridge = strstr(line, linuxBridgeFoundPrefix)) != NULL)
         {
-            OvsActionDebug("%s found existing parent bridge %s",
-                __func__, bridge);
+            OvsActionDebug("%s found existing parent bridge %s for %s",
+                __func__, bridge, if_name);
             break;
         }
     }
@@ -427,7 +536,7 @@ OVS_STATUS getExistingLinuxParentBridge(Gateway_Config * req,
     if (!bridge)
     {
         OvsActionDebug("%s didn't find existing parent bridge for %s\n",
-            __func__, req->if_name);
+            __func__, if_name);
         return OVS_SUCCESS_STATUS;
     }
     bridge += strlen(linuxBridgeFoundPrefix);
@@ -443,14 +552,14 @@ OVS_STATUS getExistingLinuxParentBridge(Gateway_Config * req,
     len = strlen(existing_bridge);
     if (len > 0)
     {
-        OvsActionDebug("%s found existing bridge=%s, len=%zu\n",
-            __func__, existing_bridge, len);
+        OvsActionDebug("%s found existing bridge=%s, len=%zu for %s\n",
+            __func__, existing_bridge, len, if_name);
         *found = true;
     }
     return OVS_SUCCESS_STATUS;
 }
 
-OVS_STATUS removeExistingInterfacePort(Gateway_Config * req, bool ovs_enabled)
+static OVS_STATUS removeExistingInterfacePort(Gateway_Config * req, bool ovs_enabled)
 {
     size_t len = 0;
     char cmd[250] = {0};
@@ -461,12 +570,12 @@ OVS_STATUS removeExistingInterfacePort(Gateway_Config * req, bool ovs_enabled)
 
     if (ovs_enabled)
     {
-        status = getExistingOvsParentBridge(req, existingBridge,
+        status = getExistingOvsParentBridge(req->if_name, existingBridge,
             sizeof(existingBridge), &found);
     }
     else
     {
-        status = getExistingLinuxParentBridge(req, existingBridge,
+        status = getExistingLinuxParentBridge(req->if_name, existingBridge,
             sizeof(existingBridge), &found);
     }
     if (status != OVS_SUCCESS_STATUS)
@@ -518,7 +627,7 @@ OVS_STATUS removeExistingInterfacePort(Gateway_Config * req, bool ovs_enabled)
     return status;
 }
 
-OVS_STATUS configureParentBridge(Gateway_Config * req, bool ovs_enabled)
+static OVS_STATUS configureParentBridge(Gateway_Config * req, bool ovs_enabled)
 {
     char cmd[250] = {0};
     char ports[128] = {0};

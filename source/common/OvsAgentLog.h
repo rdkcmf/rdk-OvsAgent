@@ -22,7 +22,9 @@
 #include <stdarg.h>
 #include "common/log.h"
 
+#ifndef OVS_AGENT_API_LOG_FILE
 #define OVS_AGENT_API_LOG_FILE   "/rdklogs/logs/OvsAgentApi.log"
+#endif
 
 /**
  * @brief Configures logging for the various sub-systems with different
