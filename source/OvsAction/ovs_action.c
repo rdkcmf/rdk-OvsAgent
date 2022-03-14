@@ -92,6 +92,11 @@ static bool SetModelNum(const char * model_num, ovs_action_config * config)
         config->modelNum = OVS_SR213_MODEL;
         rtn = true;
     }
+    else if (strcmp(model_num, "TG4482A") == 0)
+    {
+        config->modelNum = OVS_TG4482A_MODEL;
+        rtn = true;
+    }
     else
     {
         config->modelNum = OVS_UNKNOWN_MODEL;
@@ -942,7 +947,8 @@ static OVS_STATUS ovs_setup_port_flows(Gateway_Config * req)
         if ((g_ovsActionConfig.modelNum == OVS_CGM4140COM_MODEL) ||
             (g_ovsActionConfig.modelNum == OVS_TG3482G_MODEL) ||
             (g_ovsActionConfig.modelNum == OVS_CGM4331COM_MODEL) ||
-            (g_ovsActionConfig.modelNum == OVS_CGM4981COM_MODEL))
+            (g_ovsActionConfig.modelNum == OVS_CGM4981COM_MODEL) ||
+            (g_ovsActionConfig.modelNum == OVS_TG4482A_MODEL))
         {
             if ((status = ovs_setup_admin_gui_access(req)) != OVS_SUCCESS_STATUS)
             {
