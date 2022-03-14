@@ -160,107 +160,6 @@ static bool GetLan0IPAddess(char *ip_address, size_t size)
     return false;
 }
 
-static bool ipv4_to_cidr_notation(char *ip, char *cidr, size_t cidr_size)
-{
-    if (!ip || !cidr)
-    {
-        return false;
-    }
-
-    const char * endptr = strrchr(ip, '.');
-    if (!endptr)
-    {
-        OvsActionError("%s failed to find last '.' in IP %s!\n", __func__, ip);
-        return false;
-    }
-    size_t size = (size_t) (endptr - ip);
-    if (size==0 || size+5>=cidr_size)
-    { // no space for current str and ".0/24" and null char
-        OvsActionError("%s invalid size detected for CIDR string!\n", __func__);
-        return false;
-    }
-    strncpy(cidr, ip, size);
-    strcat(cidr, ".0/24");
-    OvsActionInfo("%s IP Addr=%s, size=%zu, len=%zu, CIDR=%s, size=%zu, len=%zu\n",
-        __func__, ip, size, strlen(ip), cidr, cidr_size, strlen(cidr));
-    return true;
-}
-
-// RDKB-35546
-static OVS_STATUS ovs_setup_gre_offloading(Gateway_Config * req)
-{
-    char cmd[250] = {0};
-    char ip_address[16] = {0};
-    char cidr[32] = {0};
-    char associatedBridge[] = "brlan0";
-
-    if (!req)
-    {
-        return OVS_FAILED_STATUS;
-    }
-
-    if (!GetLan0IPAddess(ip_address, sizeof(ip_address)))
-    {
-        return OVS_FAILED_STATUS;
-    }
-
-    if (!ipv4_to_cidr_notation(ip_address, cidr, sizeof(cidr)))
-    {
-        return OVS_FAILED_STATUS;
-    }
-
-    snprintf(cmd, 250, "ovs-ofctl --strict del-flows %s \"table=0, priority=50, ip_dst=%s, ct_state=-trk, tcp\"",
-        associatedBridge, cidr);
-    OvsActionDebug("%s Cmd: %s\n", __func__, cmd);
-    system(cmd);
-
-    memset(cmd, 0, sizeof (cmd));
-    snprintf(cmd, 250, "ovs-ofctl --strict del-flows %s \"table=0, priority=50, ip_dst=%s, ct_state=+trk+new, tcp\"",
-        associatedBridge, cidr);
-    OvsActionDebug("%s Cmd: %s\n", __func__, cmd);
-    system(cmd);
-
-    memset(cmd, 0, sizeof (cmd));
-    snprintf(cmd, 250, "ovs-ofctl --strict del-flows %s \"table=0, priority=50, ip_dst=%s, ct_state=-trk, udp\"",
-        associatedBridge, cidr);
-    OvsActionDebug("%s Cmd: %s\n", __func__, cmd);
-    system(cmd);
-
-    memset(cmd, 0, sizeof (cmd));
-    snprintf(cmd, 250, "ovs-ofctl --strict del-flows %s \"table=0, priority=50, ip_dst=%s, ct_state=+trk+new, udp\"",
-        associatedBridge, cidr);
-    OvsActionDebug("%s Cmd: %s\n", __func__, cmd);
-    system(cmd);
-
-    if (req->if_cmd == OVS_IF_UP_CMD)
-    {
-        memset(cmd, 0, sizeof (cmd));
-        snprintf(cmd, 250, "ovs-ofctl add-flow %s \"table=0, priority=50, ip_dst=%s, ct_state=-trk, tcp, actions=ct(table=0)\"",
-            associatedBridge, cidr);
-        OvsActionDebug("%s Cmd: %s\n", __func__, cmd);
-        system(cmd);
-
-        memset(cmd, 0, sizeof (cmd));
-        snprintf(cmd, 250, "ovs-ofctl add-flow %s \"table=0, priority=50, ip_dst=%s, ct_state=+trk+new, tcp, actions=ct(commit),NORMAL\"",
-            associatedBridge, cidr);
-        OvsActionDebug("%s Cmd: %s\n", __func__, cmd);
-        system(cmd);
-
-        memset(cmd, 0, sizeof (cmd));
-        snprintf(cmd, 250, "ovs-ofctl add-flow %s \"table=0, priority=50, ip_dst=%s, ct_state=-trk, udp, actions=ct(table=0)\"",
-            associatedBridge, cidr);
-        OvsActionDebug("%s Cmd: %s\n", __func__, cmd);
-        system(cmd);
-
-        memset(cmd, 0, sizeof (cmd));
-        snprintf(cmd, 250, "ovs-ofctl add-flow %s \"table=0, priority=50, ip_dst=%s, ct_state=+trk+new, udp, actions=ct(commit),NORMAL\"",
-            associatedBridge, cidr);
-        OvsActionDebug("%s Cmd: %s\n", __func__, cmd);
-        system(cmd);
-    }
-    return OVS_SUCCESS_STATUS;
-}
-
 // Fix for TCXB6-9125, ARRISXB6-12373, TCXB7-4051 and TCXB8-473
 static OVS_STATUS ovs_setup_admin_gui_access(Gateway_Config * req)
 {
@@ -767,20 +666,6 @@ static OVS_STATUS ovs_createBridge(Gateway_Config * req)
         system(cmd);
     }
 
-    // setup GRE offloading on TCHXB6
-    if ((g_ovsActionConfig.modelNum == OVS_CGM4140COM_MODEL) &&
-        (strcmp(req->parent_bridge, "br403") == 0) &&
-        (strcmp(req->if_name, "br403") == 0) &&
-        (req->if_cmd == OVS_IF_UP_CMD || req->if_cmd == OVS_BR_REMOVE_CMD))
-    {
-        if ((status = ovs_setup_gre_offloading(req)) != OVS_SUCCESS_STATUS)
-        {
-            OvsActionError(
-                "%s failed to setup GRE Offloading for Bridge %s, Port %s.\n",
-                __func__, req->parent_bridge, req->if_name);
-            return status;
-        }
-    }
     return status;
 }
 
