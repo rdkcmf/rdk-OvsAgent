@@ -78,6 +78,11 @@ static bool SetModelNum(const char * model_num, ovs_action_config * config)
         config->modelNum = OVS_SR203_MODEL;
         rtn = true;
     }
+    else if (strcmp(model_num, "SR213") == 0)
+    {
+        config->modelNum = OVS_SR213_MODEL;
+        rtn = true;
+    }
     else
     {
         config->modelNum = OVS_UNKNOWN_MODEL;
