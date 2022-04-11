@@ -141,3 +141,11 @@ TEST_F(JsonParserTestFixture, monitor_update_test)
 
     EXPECT_EQ(OVS_SUCCESS_STATUS, ovsdb_parse_msg(example_update.c_str(), example_update.length()));
 }
+
+TEST(JsonParserTest, monitor_update_delete)
+{
+    const std::string monitor_update = "{\"id\":null,\"method\":\"update\",\"params\":[\"2001\",{\"Gateway_Config\":{\"84182ddd-4a44-436b-b9f5-a66aec05a7bc\":{\"old\":{\"if_name\":\"nsgmii1.101\",\"_version\":[\"uuid\",\"d94589a4-1ae9-4144-8e02-c8b68964d0ac\"],\"mtu\":1500,\"parent_ifname\":\"\",\"if_type\":0,\"parent_bridge\":\"brlan1\",\"gre_ifname\":\"null\",\"vlan_id\":0,\"netmask\":\"\",\"if_cmd\":0,\"gre_remote_inet_addr\":\"\",\"gre_local_inet_addr\":\"\",\"inet_addr\":\"\"}}}}]}";
+
+    EXPECT_EQ(OVS_SUCCESS_STATUS,
+        ovsdb_parse_msg(monitor_update.c_str(), monitor_update.length()));
+}

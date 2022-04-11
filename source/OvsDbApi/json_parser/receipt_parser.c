@@ -45,7 +45,7 @@ OvsDb_Base_Receipt* ovsdb_parse_result(OVSDB_RECEIPT_ID type, json_t* receipt)
     return parser_lkup_tbl[type](receipt);
 }
 
-OvsDb_Base_Receipt* insert_receipt_parser(json_t* receipt)
+static OvsDb_Base_Receipt* insert_receipt_parser(json_t* receipt)
 {
     if(receipt == NULL){
         OvsDbApiError("Cannot call insert_receipt_parser with NULL receipt.\n");
@@ -94,7 +94,7 @@ OvsDb_Base_Receipt* insert_receipt_parser(json_t* receipt)
     return (OvsDb_Base_Receipt*)insert_receipt;
 }
 
-OvsDb_Base_Receipt* monitor_receipt_parser(json_t* receipt)
+static OvsDb_Base_Receipt* monitor_receipt_parser(json_t* receipt)
 {
     if(receipt == NULL){
         OvsDbApiError("Cannot call monitor_receipt_parser with NULL result.\n");
@@ -115,7 +115,7 @@ OvsDb_Base_Receipt* monitor_receipt_parser(json_t* receipt)
     return (OvsDb_Base_Receipt*)update_receipt;
 }
 
-OvsDb_Base_Receipt* monitor_cancel_receipt_parser(json_t* receipt)
+static OvsDb_Base_Receipt* monitor_cancel_receipt_parser(json_t* receipt)
 {
     if(receipt == NULL){
         OvsDbApiError("Cannot call monitor_cancel_receipt_parser with NULL receipt.\n");

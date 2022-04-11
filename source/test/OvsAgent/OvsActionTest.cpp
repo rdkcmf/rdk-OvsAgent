@@ -159,20 +159,30 @@ TEST_F(OvsActionTestFixture, ovs_action_add_bridge_up_valid)
     EXPECT_EQ(OVS_SUCCESS_STATUS, ovs_action_gateway_config(&cfg));
 }
 
+// RDKB-41589
+// test case: add port to a parent bridge that does not exist
 TEST_F(OvsActionTestFixture, ovs_action_add_vlan_up_valid)
 {
     const OVS_IF_TYPE ifType = OVS_VLAN_IF_TYPE;
     const OVS_CMD     ifCmd = OVS_IF_UP_CMD;
-    const std::string parentIfName = "brlan0";
-    const std::string ifName = "wifi0";
-    const std::string vlanId = "100";
-    //const std::string parentBridge = "brlan0"; // TODO: Add Parent Bridge tests
+    const std::string parentIfName = "pgd0-91";
+    const std::string ifName = "pgd0-91.200";
+    const std::string vlanId = "200";
+    const std::string parentBridge = "dummy";
+    const std::string expectedParentBridgeCmd = "ovs-vsctl iface-to-br " + ifName;
+    const std::string expectedBridgePortsCmd = "ovs-vsctl list-ports " + parentBridge;
+    //char expectedParentBridge[] = "dummy\n";
+    char expectedBridgePorts[] = "pgd0-91.200\n";
+    FILE * expectedFd1 = (FILE *)0xffffffff;
+    FILE * expectedFd2 = (FILE *)0xfffffffe;
     char expectedModel[] = "CGM4140COM";
 
     std::vector<std::string> expectedCmds;
     expectedCmds.push_back("vconfig add " + parentIfName + " " + vlanId);
     expectedCmds.push_back("ifconfig " + ifName + " up");
-    //expectedCmds.push_back("ovs-vsctl add-port " + parentBridge + " " + ifName);
+    expectedCmds.push_back("ovs-vsctl add-br " + parentBridge);
+    expectedCmds.push_back("ifconfig " + parentBridge + " up");
+    expectedCmds.push_back("ovs-vsctl add-port " + parentBridge + " " + ifName);
 
     Gateway_Config cfg = {0};
     cfg.if_type = ifType;
@@ -180,7 +190,36 @@ TEST_F(OvsActionTestFixture, ovs_action_add_vlan_up_valid)
     strcpy(cfg.parent_ifname, const_cast<char *>(parentIfName.c_str()));
     strcpy(cfg.if_name, const_cast<char *>(ifName.c_str()));
     cfg.vlan_id = atoi(vlanId.c_str());
-    //strcpy(cfg.parent_bridge, const_cast<char *>(parentBridge.c_str()));
+    strcpy(cfg.parent_bridge, const_cast<char *>(parentBridge.c_str()));
+
+    EXPECT_CALL(*g_fileIOMock, popen(StrEq(expectedParentBridgeCmd), StrEq("r")))
+       .Times(1)
+       .WillOnce(::testing::Return(expectedFd1));
+    EXPECT_CALL(*g_fileIOMock, popen(StrEq(expectedBridgePortsCmd), StrEq("r")))
+       .Times(1)
+       .WillOnce(::testing::Return(expectedFd2));
+
+    EXPECT_CALL(*g_fileIOMock, pclose(expectedFd1))
+       .Times(1)
+       .WillOnce(::testing::Return(0));
+    EXPECT_CALL(*g_fileIOMock, pclose(expectedFd2))
+       .Times(1)
+       .WillOnce(::testing::Return(0));
+
+    EXPECT_CALL(*g_fileIOMock, fgets(_, _, expectedFd1))
+        .Times(1)
+        /*.WillOnce(::testing::DoAll(
+            SetArgNPointeeTo<0>(std::begin(expectedParentBridge), sizeof(expectedParentBridge)),
+            ::testing::Return((char*)expectedParentBridge)
+        )) // Set .Times(2) and uncomment to add port to an existing bridge */
+        .WillOnce(::testing::ReturnNull());
+    EXPECT_CALL(*g_fileIOMock, fgets(_, _, expectedFd2))
+        .Times(2)
+        .WillOnce(::testing::DoAll(
+            SetArgNPointeeTo<0>(std::begin(expectedBridgePorts), sizeof(expectedBridgePorts)),
+            ::testing::Return((char*)expectedBridgePorts)
+        ))
+        .WillOnce(::testing::ReturnNull());
 
     EXPECT_CALL(*g_utilsMock, system(_))
         .Times(0);

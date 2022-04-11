@@ -216,12 +216,12 @@ OVS_STATUS ovsdb_parse_msg(const char* json_str, size_t size)
     return status;
 }
 
-OVS_STATUS ovsdb_parse_params(json_t* params)
+static OVS_STATUS ovsdb_parse_params(json_t* params)
 {
     size_t index;
     json_t* value;
     const char * uuid = NULL;
-    OVS_STATUS status;
+    OVS_STATUS status = OVS_SUCCESS_STATUS;
 
     if(params == NULL)
     {
@@ -229,7 +229,7 @@ OVS_STATUS ovsdb_parse_params(json_t* params)
         return OVS_FAILED_STATUS;
     }
 
-    //TODO: Add check to amek sure params is an array
+    //TODO: Add check to make sure params is an array
 
     json_array_foreach(params, index, value)
     {
@@ -259,17 +259,17 @@ OVS_STATUS ovsdb_parse_params(json_t* params)
         }
     }
 
-    return OVS_SUCCESS_STATUS;
+    return status;
 }
 
-OVS_STATUS ovsdb_parse_monitor_update(const char * uuid, json_t* update)
+static OVS_STATUS ovsdb_parse_monitor_update(const char * uuid, json_t* update)
 {
     OVS_STATUS status = OVS_FAILED_STATUS;
     OvsAgent_Table_Config table_config = { 0 };
     char* str_json = NULL;
 
-    OvsDbApiDebug("%s UUID: %s, update: %s\n", __func__, uuid,
-        str_json = json_dumps(update, JSON_COMPACT));
+    str_json = json_dumps(update, JSON_COMPACT);
+    OvsDbApiDebug("%s UUID: %s, update: %s\n", __func__, uuid, str_json);
     free(str_json);
 
     if(json_object_size(update) != 1)
@@ -279,7 +279,6 @@ OVS_STATUS ovsdb_parse_monitor_update(const char * uuid, json_t* update)
     }
 
     //TODO: Make new abstraction to handle 'old' updates and things, not just 'new'
-    //
 
     void* iter = json_object_iter(update);
     const char * table_name = json_object_iter_key(iter);
@@ -290,6 +289,11 @@ OVS_STATUS ovsdb_parse_monitor_update(const char * uuid, json_t* update)
     json_t* outer_uuid = json_object_iter_value(iter2);
 
     json_t* new = json_object_get(outer_uuid, "new");
+    if (!new)
+    {   // handles and discards an update of type 'old' i.e. delete requests
+        OvsDbApiWarning("%s Ignoring monitor update!\n", __func__);
+        return OVS_SUCCESS_STATUS;
+    }
 
     strncpy(table_config.uuid, table_uuid, sizeof(table_config.uuid));
     table_config.uuid[ sizeof(table_config.uuid)-1 ] = '\0';
@@ -305,10 +309,10 @@ OVS_STATUS ovsdb_parse_monitor_update(const char * uuid, json_t* update)
     if(status != OVS_SUCCESS_STATUS)
     {
         OvsDbApiError("Failed to process monitor update.\n");
-        free(table_config.config);
-        return status;
+        goto cleanup;
     }
 
+cleanup:
     free(table_config.config);
     return status;
 }

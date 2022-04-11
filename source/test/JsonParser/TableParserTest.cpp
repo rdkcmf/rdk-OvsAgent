@@ -62,3 +62,27 @@ TEST(TableParserTest, feedback_test)
     EXPECT_STREQ("18ca5061-c9ef-42dc-9579-f9e3167a1ae7", fb->req_uuid);
     EXPECT_EQ(OVS_SUCCESS_STATUS, fb->status);
 }
+
+// RDKB-41589
+TEST(TableParserTest, gwconfig_vlan_test)
+{
+    const char* example_table_name = "Gateway_Config";
+
+    json_t* example_update = json_loads("{\"_version\":[\"uuid\",\"02b8db48-f290-4f68-8410-43f4fd91ff2d\"],\"if_name\":\"pgd0-91.200\",\"mtu\":[\"set\",[]],\"inet_addr\":[\"set\",[]],\"gre_local_inet_addr\":[\"set\",[]],\"parent_ifname\":\"pgd0-91\",\"vlan_id\":200,\"if_type\":4,\"parent_bridge\":\"dummy\",\"gre_ifname\":[\"set\",[]],\"netmask\":[\"set\",[]],\"if_cmd\":0,\"gre_remote_inet_addr\":[\"set\",[]]}", 0, NULL);
+
+    Rdkb_Table_Config table_config;
+    ASSERT_EQ(OVS_SUCCESS_STATUS, parse_table(example_table_name, example_update, &table_config));
+    ASSERT_EQ(OVS_GW_CONFIG_TABLE, table_config.table.id);
+
+    Gateway_Config* gw_config = (Gateway_Config*) table_config.config;
+    EXPECT_STREQ("pgd0-91.200", gw_config->if_name);
+    EXPECT_EQ(0, gw_config->mtu);
+    EXPECT_STREQ("pgd0-91", gw_config->parent_ifname);
+    EXPECT_STREQ("dummy", gw_config->parent_bridge);
+    EXPECT_EQ(200, gw_config->vlan_id);
+    EXPECT_STREQ("", gw_config->netmask);
+    EXPECT_EQ(0, gw_config->if_cmd);
+    EXPECT_STREQ("", gw_config->gre_remote_inet_addr);
+    EXPECT_STREQ("", gw_config->gre_local_inet_addr);
+    EXPECT_STREQ("", gw_config->inet_addr);
+}
