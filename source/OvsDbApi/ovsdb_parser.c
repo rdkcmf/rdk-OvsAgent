@@ -37,15 +37,16 @@ char * ovsdb_insert_to_json(Rdkb_Table_Config * table_config, const char * uniqu
     switch(table_config->table.id)
     {
         case OVS_GW_CONFIG_TABLE:
-            str_json = gc_insert_to_json( (Gateway_Config*) table_config->config, unique_id);
+            str_json = gc_insert_to_json((Gateway_Config*) table_config->config, unique_id);
             break;
 
         case OVS_FEEDBACK_TABLE:
-            str_json = fb_insert_to_json( (Feedback*) table_config->config, unique_id);
+            str_json = fb_insert_to_json((Feedback*) table_config->config, unique_id);
             break;
 
          default:
-            OvsDbApiError("Failed to identify config table, corrupted configuration or this table is not implemented.\n");
+            OvsDbApiError("%s Failed to identify config with table id %d\n",
+                __func__, table_config->table.id);
             break;
     }
 
@@ -55,6 +56,11 @@ char * ovsdb_insert_to_json(Rdkb_Table_Config * table_config, const char * uniqu
 char * ovsdb_monitor_to_json(OVS_TABLE ovsdb_table, const char * rID, const char * unique_id)
 {
   char * table = NULL;
+  json_t *js = NULL;
+  json_t *jparams;
+  json_t *jtbl;
+  json_t *jo_col;
+  char * str_json = NULL;
 
   if(ovsdb_table == OVS_GW_CONFIG_TABLE)
   {
@@ -66,93 +72,162 @@ char * ovsdb_monitor_to_json(OVS_TABLE ovsdb_table, const char * rID, const char
   }
   else
   {
-      printf("Only Gateway_Config is implemented in monitor_to_json!\n");
+     OvsDbApiError("%s Failed to identify config with table id %d\n",
+        __func__, ovsdb_table);
       return NULL;
   }
 
-  int ret;
-  json_t *js = NULL;
-  json_t *jparams;
-  json_t *jtblval;
-  json_t *jtbl;
-  json_t *jo_col;
+  jparams = json_array();
+  json_array_append_new(jparams, json_string (OVSDB_DEF_DB));
+  json_array_append_new(jparams, json_string (unique_id));
 
-  jparams = json_array ();
-  json_array_append_new (jparams, json_string (OVSDB_DEF_DB));
-  json_array_append_new (jparams, json_string (unique_id));
+  jtbl = json_object();
+  jo_col = json_object();
 
-  jtbl = json_object ();
-  jo_col = json_object ();
+  json_object_set_new(jtbl, table, jo_col);
 
-  json_object_set_new (jtbl, table, jo_col);
+  json_array_append_new(jparams, jtbl);
 
-  json_array_append_new (jparams, jtbl);
+  js = json_object();
 
-  js = json_object ();
-
-  ret = json_object_set_new (js, "method", json_string("monitor"));
-  if(ret < 0)
+  if (json_object_set_new(js, "method", json_string("monitor")) < 0)
   {
-      printf("Error adding method key.\n");
+      OvsDbApiError("%s Error adding method key.\n", __func__);
       return NULL;
   }
 
-  ret = json_object_set_new(js, "params", jparams);
-  if(ret < 0)
+  if (json_object_set_new(js, "params", jparams) < 0)
   {
-      printf("Error adding params array.\n");
+      OvsDbApiError("%s Error adding params array.\n", __func__);
       return NULL;
   }
 
-  ret = json_object_set_new (js, "id", json_string(rID));
-  if(ret < 0)
+  if (json_object_set_new(js, "id", json_string(rID)) < 0)
   {
-      printf("Error adding ID key.\n");
+      OvsDbApiError("%s Error adding ID key.\n", __func__);
       return NULL;
   }
 
-  char * str_out = json_dumps(js, JSON_COMPACT);
+  str_json = json_dumps(js, JSON_COMPACT);
   json_decref(js);
-  return str_out;
+  return str_json;
 
   //TODO: Check to make sure we are releasing all JSON objects and this isn't memory leak.
 }
 
 char * ovsdb_monitor_cancel_to_json(const char * old_id, const char * rID)
 {
-  int ret;
   json_t *js = NULL;
-  json_t *jparams;
+  json_t *jparams = NULL;
+  char * str_json = NULL;
 
-  jparams = json_array ();
-  json_array_append_new (jparams, json_string (old_id));
+  jparams = json_array();
+  json_array_append_new(jparams, json_string (old_id));
+  js = json_object();
 
-  js = json_object ();
-
-  ret = json_object_set_new (js, "method", json_string("monitor_cancel"));
-  if(ret < 0)
+  if (json_object_set_new(js, "method", json_string("monitor_cancel")) < 0)
   {
-      printf("Error adding method key.\n");
+      OvsDbApiError("%s Error adding method key.\n", __func__);
       return NULL;
   }
 
-  ret = json_object_set_new(js, "params", jparams);
-  if(ret < 0)
+  if (json_object_set_new(js, "params", jparams) < 0)
   {
-      printf("Error adding params array.\n");
+      OvsDbApiError("%s Error adding params array.\n", __func__);
       return NULL;
   }
 
-  ret = json_object_set_new (js, "id", json_string(rID));
-  if(ret < 0)
+  if (json_object_set_new(js, "id", json_string(rID)) < 0)
   {
-      printf("Error adding ID key.\n");
+      OvsDbApiError("%s Error adding ID key.\n", __func__);
       return NULL;
   }
 
-  char * str_out = json_dumps(js, JSON_COMPACT);
+  str_json = json_dumps(js, JSON_COMPACT);
   json_decref(js);
-  return str_out;
+  return str_json;
+}
+
+char * ovsdb_delete_to_json(OVS_TABLE ovsdb_table, const char * rID,
+    const char * key, const char * value)
+{
+    char * table = NULL;
+    json_t *js = NULL;
+    json_t *jparams;
+    //json_t *jtbl;
+    //json_t *jo_col;
+    json_t * where_json;
+    char * str_json = NULL;
+
+    if(ovsdb_table == OVS_GW_CONFIG_TABLE)
+    {
+        table = GATEWAY_CONFIG_TABLE_NAME;
+    }
+    else if(ovsdb_table == OVS_FEEDBACK_TABLE)
+    {
+        table = FEEDBACK_TABLE_NAME;
+    }
+    else
+    {
+        OvsDbApiError("%s Failed to identify config with table id %d\n",
+            __func__, ovsdb_table);
+        return NULL;
+    }
+
+    jparams = json_array();
+    json_array_append_new(jparams, json_string (OVSDB_DEF_DB));
+    js = json_object();
+
+    if (json_object_set_new(js, "method", json_string("transact")) < 0)
+    {
+        OvsDbApiError("%s Error adding method key.\n", __func__);
+        return NULL;
+    }
+    if (json_object_set_new(js, "params", jparams) < 0)
+    {
+        OvsDbApiError("%s Error adding params array.\n", __func__);
+        return NULL;
+    }
+
+    json_t * json = json_object();
+    if (json_object_set_new(json, "op", json_string("delete")) < 0)
+    {
+        OvsDbApiError("%s Error adding op key.\n", __func__);
+        return NULL;
+    }
+
+    if (json_object_set_new(json, "table", json_string(table)) < 0)
+    {
+        OvsDbApiError("%s Error adding table key.\n", __func__);
+        return NULL;
+    }
+
+    if ((strcmp(OVSDB_TABLE_UUID, key) == 0) ||
+        (strcmp(OVSDB_TABLE_UUID_ALT, key)== 0))
+    {
+        json_t * uuid_json = json_pack("[s,s]", OVSDB_TABLE_UUID, value);
+        where_json = json_pack("[[s,s,o]]", OVSDB_TABLE_UUID_ALT, "==", uuid_json);
+    }
+    else
+    {
+        where_json = json_pack("[[s,s,s]]", key, "==", value);
+    }
+    if (json_object_set_new(json, "where", where_json) < 0)
+    {
+        OvsDbApiError("%s Error adding where key.\n", __func__);
+        return NULL;
+    }
+    json_array_append_new(jparams, json);
+
+    if (json_object_set_new(js, "id", json_string(rID)) < 0)
+    {
+        OvsDbApiError("%s Error adding ID key.\n", __func__);
+        return NULL;
+    }
+
+    str_json = json_dumps(js, JSON_COMPACT);
+    json_decref(js);
+    return str_json;
 }
 
 OVS_STATUS ovsdb_parse_msg(const char* json_str, size_t size)
@@ -160,46 +235,49 @@ OVS_STATUS ovsdb_parse_msg(const char* json_str, size_t size)
     OVS_STATUS status = OVS_FAILED_STATUS;
     json_error_t error;
     json_t* msg = NULL;
-    int bytes_read = 0;
+    size_t bytes_read = 0;
 
-    if(json_str == NULL)
+    if (!json_str)
     {
-        OvsDbApiError("JSON message is NULL.\n");
+        OvsDbApiError("%s JSON message is NULL.\n", __func__);
         return OVS_FAILED_STATUS;
     }
 
     do
     {
         msg = json_loads(json_str, JSON_DISABLE_EOF_CHECK, &error);
-        if(msg == NULL)
+        if (!msg)
         {
-            OvsDbApiError("Failed to parse JRPC: %s\n", error.text);
+            OvsDbApiError("%s failed to parse JRPC: %s\n",
+                __func__, error.text);
             return OVS_FAILED_STATUS;
         }
 
         bytes_read += error.position;
         json_str += error.position;
+        OvsDbApiDebug("%s position=%d, bytes read=%zu, size=%zu\n",
+            __func__, error.position, bytes_read, size);
 
         json_t* id = json_object_get(msg, "id");
-        if(id == NULL)
+        if (!id)
         {
-            OvsDbApiError("Cannot fetch ID from the JRPC, must be malformed message.\n");
+            OvsDbApiError("%s cannot fetch ID from the JRPC, must be malformed message.\n",
+                __func__);
             return OVS_FAILED_STATUS; // TODO: Use more meaningful OVS_STATUS code
         }
 
-        if(json_is_null(id))
+        if (json_is_null(id))
         {
             //TODO: Check 'method' to make sure it's monitor update
-            OvsDbApiDebug("JSON monitor update\n");
             json_t* method = json_object_get(msg, "method");
-            if(method == NULL || json_is_string(method) == 0)
+            if (!method || json_is_string(method) == 0)
             {
                 OvsDbApiError("The value of 'method' within JSON string is invalid.\n");
                 return OVS_FAILED_STATUS;
             }
-
+            OvsDbApiDebug("%s JSON monitor update (id=null).\n", __func__);
             json_t* params = json_object_get(msg, "params");
-            if(params == NULL || json_is_array(params) == 0)
+            if (!params || json_is_array(params) == 0)
             {
                 OvsDbApiError("The value of 'params' with monitor update is invalid.\n");
                 return OVS_FAILED_STATUS;
@@ -211,7 +289,7 @@ OVS_STATUS ovsdb_parse_msg(const char* json_str, size_t size)
         {
             status = receipt_list_process(json_string_value(id), json_object_get(msg, "result"));
         }
-    } while(bytes_read != size);
+    } while (bytes_read != size);
 
     return status;
 }
@@ -223,9 +301,9 @@ static OVS_STATUS ovsdb_parse_params(json_t* params)
     const char * uuid = NULL;
     OVS_STATUS status = OVS_SUCCESS_STATUS;
 
-    if(params == NULL)
+    if (!params)
     {
-        OvsDbApiError("params passed to ovsdb_parse_params is NULL.\n");
+        OvsDbApiError("%s params is NULL.\n", __func__);
         return OVS_FAILED_STATUS;
     }
 
@@ -233,9 +311,9 @@ static OVS_STATUS ovsdb_parse_params(json_t* params)
 
     json_array_foreach(params, index, value)
     {
-        if(index == 0)
+        if (index == 0)
         {
-            if(value == NULL || json_is_string(value) == 0)
+            if (!value || json_is_string(value) == 0)
             {
                 OvsDbApiError("Unable to get the UUID from the monitor update.\n");
                 return OVS_FAILED_STATUS;
@@ -245,16 +323,17 @@ static OVS_STATUS ovsdb_parse_params(json_t* params)
         }
         else
         {
-            if(value == NULL || json_is_object(value) == 0)
+            if (!value || json_is_object(value) == 0)
             {
                 OvsDbApiError("Unable to get the object from the monitor update.\n");
                 return OVS_FAILED_STATUS;
             }
 
             status = ovsdb_parse_monitor_update(uuid, value);
-            if(status != OVS_SUCCESS_STATUS)
+            if (status != OVS_SUCCESS_STATUS)
             {
-                OvsDbApiError("Failed to parse monitor update.\n");
+                OvsDbApiError("%s failed to parse monitor update for UUID: %s\n",
+                    __func__, uuid);
             }
         }
     }
@@ -274,7 +353,8 @@ static OVS_STATUS ovsdb_parse_monitor_update(const char * uuid, json_t* update)
 
     if(json_object_size(update) != 1)
     {
-        OvsDbApiError("The size of the update object isn't 1?\n");
+        OvsDbApiError("%s as the size of the update object isn't 1\n",
+            __func__);
         return OVS_FAILED_STATUS;
     }
 
@@ -291,7 +371,8 @@ static OVS_STATUS ovsdb_parse_monitor_update(const char * uuid, json_t* update)
     json_t* new = json_object_get(outer_uuid, "new");
     if (!new)
     {   // handles and discards an update of type 'old' i.e. delete requests
-        OvsDbApiWarning("%s Ignoring monitor update!\n", __func__);
+        OvsDbApiWarning("%s ignoring monitor update with UUID: %s!\n",
+            __func__, uuid);
         return OVS_SUCCESS_STATUS;
     }
 
@@ -301,14 +382,16 @@ static OVS_STATUS ovsdb_parse_monitor_update(const char * uuid, json_t* update)
     status = parse_table(table_name, new, (Rdkb_Table_Config*) &table_config);
     if(status != OVS_SUCCESS_STATUS)
     {
-        OvsDbApiError("Failed to parse local structure.\n");
+        OvsDbApiError("%s failed to parse local structure for UUID: %s.\n",
+            __func__, uuid);
         return status;
     }
 
     status = mon_list_process(uuid, (Rdkb_Table_Config*)&table_config);
     if(status != OVS_SUCCESS_STATUS)
     {
-        OvsDbApiError("Failed to process monitor update.\n");
+        OvsDbApiError("%s failed to process monitor update for UUID: %s.\n",
+            __func__, uuid);
         goto cleanup;
     }
 

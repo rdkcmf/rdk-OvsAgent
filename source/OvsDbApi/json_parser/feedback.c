@@ -22,16 +22,18 @@
 #include "OvsDbApi/OvsDbDefs.h"
 #include "common/OvsAgentLog.h"
 
-char * fb_insert_to_json(Feedback * feedback, const char * unique_id){
+char * fb_insert_to_json(Feedback * feedback, const char * unique_id)
+{
+  json_t *js_row = NULL;
+  json_t *js_mainObj = NULL;
+  json_t *js_params = NULL;
+  json_t *js_main = NULL;
+  char *str_out = NULL;
 
-  json_t *js_row;
-  json_t *js_mainObj;
-  json_t *js_params;
-  json_t *js_main;
-
-  if(feedback == NULL || unique_id == NULL)
+  if (!feedback || !unique_id)
   {
-      OvsDbApiError("Unable to create JSON string because of incomplete parameters.\n");
+      OvsDbApiError("%s Unable to create JSON string due to incomplete parameters.\n",
+          __func__);
       return NULL;
   }
 
@@ -46,12 +48,12 @@ char * fb_insert_to_json(Feedback * feedback, const char * unique_id){
 
   if (0 < json_object_set_new (js_row, "req_uuid", json_string (feedback->req_uuid)))
   {
-      OvsDbApiError ("Error adding GRE ifname.\n");
+      OvsDbApiError("%s Error adding req_uuid.\n", __func__);
   }
 
   if (0 < json_object_set_new (js_row, "status", json_integer (feedback->status)))
   {
-      OvsDbApiError ("Error adding ifname.\n");
+      OvsDbApiError("%s Error adding status.\n", __func__);
   }
 
   json_object_set_new (js_mainObj, "row", js_row);
@@ -60,7 +62,7 @@ char * fb_insert_to_json(Feedback * feedback, const char * unique_id){
   json_object_set_new (js_main, "id", json_string (unique_id));
   json_object_set_new (js_main, "params", js_params);
 
-  char * str_out = json_dumps(js_main, JSON_COMPACT);
+  str_out = json_dumps(js_main, JSON_COMPACT);
   json_decref(js_main);
   return str_out;
 }

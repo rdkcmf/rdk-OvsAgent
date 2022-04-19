@@ -22,7 +22,10 @@
 #include "OvsDbApi/OvsDbDefs.h"
 
 char * ovsdb_insert_to_json(Rdkb_Table_Config * config, const char * unique_id);
-char * ovsdb_monitor_to_json(OVS_TABLE ovsdb_table, const char * rID, const char * unique_id);
+char * ovsdb_monitor_to_json(OVS_TABLE ovsdb_table, const char * rID,
+    const char * unique_id);
 char * ovsdb_monitor_cancel_to_json(const char * old_id, const char * rID);
+char * ovsdb_delete_to_json(OVS_TABLE ovsdb_table, const char * rID,
+    const char * key, const char * value);
 OVS_STATUS ovsdb_parse_msg(const char* str_json, size_t size);
 #endif

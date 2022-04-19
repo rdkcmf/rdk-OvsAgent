@@ -67,6 +67,15 @@ extern "C" OVS_STATUS ovsdb_monitor_cancel(const char * rID, ovsdb_receipt_cb re
     return g_ovsDbApiMock->ovsdb_monitor_cancel(rID, receipt_cb);
 }
 
+extern "C" OVS_STATUS ovsdb_delete(OVS_TABLE ovsdb_table, const char * key, const char * value)
+{
+    if (!g_ovsDbApiMock)
+    {
+        return OVS_FAILED_STATUS;
+    }
+    return g_ovsDbApiMock->ovsdb_delete(ovsdb_table, key, value);
+}
+
 extern "C" unsigned int id_generate(void)
 {
     if (!g_ovsDbApiMock)

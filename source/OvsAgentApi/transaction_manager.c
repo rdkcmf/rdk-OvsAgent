@@ -107,7 +107,7 @@ static bool destroy_transaction(Transaction_Entry * transaction)
 {
     if (!transaction)
     {
-        OvsAgentApiWarning("%s transaction EMPTY\n", __func__);
+        OvsAgentApiWarning("%s transaction is NULL\n", __func__);
         return false;
     }
     OvsAgentApiDebug("%s %p with Id: %u\n", __func__, transaction, transaction->id);
@@ -165,7 +165,10 @@ void deinit_transaction_manager(void)
     for (i=0; i<g_transaction_table->size; i++)
     {
         transaction = g_transaction_table->elements[i];
-        (void)destroy_transaction(transaction);
+        if (transaction)
+        {
+            (void)destroy_transaction(transaction);
+        }
     }
 
     // Delete Transaction Table's array of pointers to structures

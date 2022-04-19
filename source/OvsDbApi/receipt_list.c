@@ -37,18 +37,20 @@ static receipt_node_t* msg_list = NULL;
 
 OVS_STATUS receipt_list_add(const char* rid, OVSDB_RECEIPT_ID receipt_type, ovsdb_receipt_cb cb)
 {
-    OvsDbApiDebug("%s adding rid to list: %s\n", __func__, rid);
+    OvsDbApiDebug("%s adding rid %s with receipt type %d to list...\n",
+        __func__, rid, receipt_type);
 
-    if(rid == NULL)
+    if (!rid)
     {
-        OvsDbApiError("'rid' in %s is NULL", __func__);
+        OvsDbApiError("%s 'rid' is NULL", __func__);
         return OVS_FAILED_STATUS;
     }
 
     receipt_node_t* new_node = malloc(sizeof(receipt_node_t));
-    if(new_node == NULL)
+    if (!new_node)
     {
-        OvsDbApiError("Failed to allocate new mon_node_t node.\n");
+        OvsDbApiError("%s failed to allocate new receipt node for rid: %s\n",
+            __func__, rid);
         return OVS_FAILED_STATUS;
     }
 
@@ -58,16 +60,17 @@ OVS_STATUS receipt_list_add(const char* rid, OVSDB_RECEIPT_ID receipt_type, ovsd
     new_node->receipt_type = receipt_type;
     new_node->next = NULL;
 
-    if(msg_list == NULL)
+    if (!msg_list)
     {
         msg_list = new_node;
         return OVS_SUCCESS_STATUS;
     }
 
     receipt_node_t* temp = msg_list;
-    while(temp->next != NULL)
+    while (temp->next != NULL)
+    {
         temp = temp->next;
-
+    }
     temp->next = new_node;
     return OVS_SUCCESS_STATUS;
 }
@@ -79,24 +82,26 @@ OVS_STATUS receipt_list_process(const char* rid, json_t* result)
 
     OvsDbApiDebug("%s parsing rid: %s\n", __func__, rid);
 
-    if(rid == NULL)
+    if (!rid)
     {
-        OvsDbApiError("'rid' used in %s is NULL", __func__);
+        OvsDbApiError("%s 'rid' is NULL", __func__);
         return OVS_FAILED_STATUS;
     }
 
-    if(msg_list == NULL)
+    if (!msg_list)
     {
-        OvsDbApiError("Cannot process receipt because receipt list is empty.\n");
+        OvsDbApiError("%s Cannot process receipt with rid: %s as receipt list is empty.\n",
+            __func__, rid);
         return OVS_FAILED_STATUS;
     }
 
-    if(strncmp(rid, msg_list->rid, sizeof(msg_list->rid)) == 0)
+    if (strncmp(rid, msg_list->rid, sizeof(msg_list->rid)) == 0)
     {
         OvsDb_Base_Receipt* parsed_result = ovsdb_parse_result(msg_list->receipt_type, result);
-        if(parsed_result == NULL)  //TODO: Call callback with error rather than exit
+        if (!parsed_result)  //TODO: Call callback with error rather than exit
         {
-            OvsDbApiError("ovsdb_parse_result failed to parse result objects.\n");
+            OvsDbApiError("%s failed to parse result of receipt with rid: %s\n",
+                __func__, rid);
             return OVS_FAILED_STATUS;
         }
 
@@ -111,18 +116,19 @@ OVS_STATUS receipt_list_process(const char* rid, json_t* result)
 
     curr = msg_list;
     next = curr->next;
-    while(next != NULL)
+    while (next != NULL)
     {
-        if(strncmp(rid, next->rid, sizeof(next->rid)) == 0)
+        if (strncmp(rid, next->rid, sizeof(next->rid)) == 0)
         {
             OvsDb_Base_Receipt* parsed_result = ovsdb_parse_result(next->receipt_type, result); //Table lookup
-            if(parsed_result == NULL)
+            if (!parsed_result)
             {
-                OvsDbApiError("ovsdb_parse_result failed to parse result object.\n");
+                OvsDbApiError("%s failed to parse result of receipt with rid: %s\n",
+                    __func__, rid);
                 return OVS_FAILED_STATUS;
             }
 
-            next->callback( rid, parsed_result );
+            next->callback(rid, parsed_result);
             free(parsed_result);
             curr->next = next->next;
             free(next);
@@ -143,8 +149,12 @@ OVS_STATUS receipt_list_clear()
     receipt_node_t* curr = msg_list;
     receipt_node_t* next = NULL;
 
-    while(curr != NULL)
+    OvsDbApiDebug("%s clearing the receipt list.\n", __func__);
+
+    while (curr != NULL)
     {
+        OvsDbApiDebug("%s clearing rid: %s, Receipt Id: %d, from list.\n",
+            __func__, curr->rid, curr->receipt_type);
         next = curr->next;
         free(curr);
         curr = next;

@@ -65,7 +65,7 @@ static void* ovsdb_listen(void* data)
             break;
         }
         if (ret != 0){
-            OvsDbApiDebug("%s received %d bytes\n", __func__, ret);
+            OvsDbApiDebug("%s thread read %d bytes\n", __func__, ret);
         }
         /**
           TODO:
@@ -74,15 +74,16 @@ static void* ovsdb_listen(void* data)
         json_error_t error;
         json_t* ovsdb_msg = json_loadfd(ovsdb_fd, JSON_DISABLE_EOF_CHECK, &error);
         if(ovsdb_msg == NULL){
-            printf("Failed to load JRPC over socket: %s\n", error.text);
+            OvsDbApiError("%s Failed to load JRPC over socket: %s\n", __func__, error.text);
             continue;
         }
         **/
 
         if(ret > 0){
             status = ovsdb_parse_msg(recv_buffer, ret);
-            if(status != OVS_SUCCESS_STATUS){
-                OvsDbApiError("Failed to parse json message: %s\n", recv_buffer);
+            if (status != OVS_SUCCESS_STATUS){
+                OvsDbApiError("%s failed to parse json message: %s\n",
+                    __func__, recv_buffer);
             }
         }
     }
@@ -149,12 +150,12 @@ OVS_STATUS ovsdb_deinit()
 
     if(mon_list_clear() != OVS_SUCCESS_STATUS){
         status = OVS_FAILED_STATUS;
-        OvsDbApiError("Failed to clear monitor list.\n");
+        OvsDbApiError("%s failed to clear monitor list.\n", __func__);
     }
 
     if(receipt_list_clear() != OVS_SUCCESS_STATUS){
         status = OVS_FAILED_STATUS;
-        OvsDbApiError("Failed to clear receipt list.\n");
+        OvsDbApiError("%s failed to clear receipt list.\n", __func__);
     }
 
 
@@ -172,7 +173,7 @@ OVS_STATUS ovsdb_write(const char* rID, Rdkb_Table_Config* config, ovsdb_receipt
     OVS_STATUS status = OVS_SUCCESS_STATUS;
     char * str_json = NULL;
 
-    if(rID == NULL || config == NULL){
+    if (!rID || !config){
         OvsDbApiError("%s Invalid NULL parameter.\n", __func__);
         return OVS_FAILED_STATUS;
     }
@@ -180,7 +181,7 @@ OVS_STATUS ovsdb_write(const char* rID, Rdkb_Table_Config* config, ovsdb_receipt
     OvsDbApiDebug("%s rId: %s\n", __func__, rID);
 
     str_json = ovsdb_insert_to_json(config, rID);
-    if(str_json == NULL){
+    if (!str_json){
         OvsDbApiError("Failed to convert GW config to JSON string.\n");
         return OVS_FAILED_STATUS;
     }
@@ -222,35 +223,36 @@ OVS_STATUS ovsdb_monitor(OVS_TABLE ovsdb_table, ovsdb_mon_cb mon_cb, ovsdb_recei
     char unique_id[MAX_UUID_LEN+1] = { 0 };
     char rID[MAX_UUID_LEN+1] = { 0 };
 
-    OvsDbApiDebug("%s table: %d\n", __func__, ovsdb_table);
-
-    if(mon_cb == NULL){
+    if (!mon_cb){
         OvsDbApiError("Provided monitor callback is NULL.\n");
         return OVS_FAILED_STATUS;
     }
 
     snprintf(unique_id, sizeof(unique_id), "%u", id_generate());
-    snprintf(rID, sizeof(unique_id), "%u", id_generate());
+    snprintf(rID, sizeof(rID), "%u", id_generate());
+    OvsDbApiDebug("%s table: %d, rId: %s, Unique Id: %s\n",
+        __func__, ovsdb_table, rID, unique_id);
 
     //Create the JSON string
     str_json = ovsdb_monitor_to_json(ovsdb_table, rID, unique_id);
-    if(str_json == NULL){
-        OvsDbApiError("Unable to convert ovsdb_monitor to JSON string.\n");
+    if (!str_json){
+        OvsDbApiError("%s unable to convert to JSON string.\n", __func__);
         return OVS_FAILED_STATUS;
     }
-    OvsDbApiDebug("Generated monitor json string: %s\n", str_json);
+    OvsDbApiDebug("%s generated monitor json string: %s\n",
+        __func__, str_json);
 
     status = receipt_list_add(rID, OVSDB_MONITOR_RECEIPT_ID,
             (receipt_cb != NULL) ? receipt_cb : dummy_receipt_cb);
     if(status != OVS_SUCCESS_STATUS){
-        OvsDbApiError("Failed to register ovsdb_monitor receipt callback.\n");
+        OvsDbApiError("%s failed to register receipt callback.\n", __func__);
         free(str_json);
         return status;
     }
 
     status = mon_list_add(unique_id, mon_cb);
     if(status != OVS_SUCCESS_STATUS){
-        OvsDbApiError("Failed to register ovsdb_monitor callback.\n");
+        OvsDbApiError("%s failed to register monitor callback.\n", __func__);
         free(str_json);
         return status;
     }
@@ -280,16 +282,16 @@ OVS_STATUS ovsdb_monitor_cancel(const char * rID, ovsdb_receipt_cb receipt_cb)
     char * str_json = NULL;
     char new_id[MAX_UUID_LEN+1] = { 0 };
 
-    if(rID == NULL){
+    if (!rID){
         OvsDbApiError("%s cannot have NULL as rId.\n", __func__);
         return OVS_FAILED_STATUS;
     }
 
-    OvsDbApiDebug("%s rId: %s\n", __func__, rID);
     snprintf(new_id, sizeof(new_id), "%u", id_generate());
+    OvsDbApiDebug("%s rId: %s, New Id: %s\n", __func__, rID, new_id);
 
     str_json = ovsdb_monitor_cancel_to_json(rID, new_id);
-    if(str_json == NULL){
+    if (!str_json){
         OvsDbApiError("Failed to build monitor cancel JSON string\n");
         return OVS_FAILED_STATUS;
     }
@@ -322,6 +324,57 @@ OVS_STATUS ovsdb_monitor_cancel(const char * rID, ovsdb_receipt_cb receipt_cb)
     return status;
 }
 
+OVS_STATUS ovsdb_delete(OVS_TABLE ovsdb_table, const char * key, const char * value)
+{
+    size_t len = 0;
+    ssize_t size = 0;
+    OVS_STATUS status = OVS_SUCCESS_STATUS;
+    char * str_json = NULL;
+    char new_id[MAX_UUID_LEN+1] = { 0 };
+
+    if (!key || !value)
+    {
+        OvsDbApiError("%s Invalid NULL parameter.\n", __func__);
+        return OVS_FAILED_STATUS;
+    }
+
+    snprintf(new_id, sizeof(new_id), "%u", id_generate());
+
+    OvsDbApiDebug("%s Table: %d, New Id: %s, Key: %s, Value: %s\n", __func__,
+        ovsdb_table, new_id, key, value);
+
+    str_json = ovsdb_delete_to_json(ovsdb_table, new_id, key, value);
+    if (!str_json)
+    {
+        OvsDbApiError("%s Failed to convert GW config to JSON string.\n",
+            __func__);
+        return OVS_FAILED_STATUS;
+    }
+    OvsDbApiDebug("%s Converted to JSON str: %s\n", __func__, str_json);
+
+    status = receipt_list_add(new_id, OVSDB_DELETE_RECEIPT_ID,
+        dummy_receipt_cb);
+    if(status != OVS_SUCCESS_STATUS){
+        OvsDbApiError("%s failed to add to the receipt list.\n", __func__);
+        free(str_json);
+        return status;
+    }
+
+    len = strlen(str_json);
+    size = ovsdb_socket_write(ovsdb_sock_fd, str_json, len);
+    if (size < 0)
+    {
+        OvsDbApiError("%s failed to write JSON to socket\n", __func__);
+        free(str_json);
+        return OVS_FAILED_STATUS;
+    }
+
+    free(str_json);
+    OvsDbApiInfo("%s successfully wrote %zd/%zu bytes to socket.\n", __func__,
+        size, len);
+    return status;
+}
+
 unsigned int id_generate()
 {
     return ++id;
@@ -330,6 +383,10 @@ unsigned int id_generate()
 /** Dummy callback used to print data when not provided by API consumer **/
 static void dummy_receipt_cb(const char* rid, const OvsDb_Base_Receipt* result) //TODO: Change signature and print receipt id
 {
-    OvsDbApiDebug("%s, rid: %s, receipt_id: %d, error: %s\n", __func__,
+    if (!rid || !result)
+    {
+        return;
+    }
+    OvsDbApiDebug("%s, rid: %s, Receipt Id: %d, error: %s\n", __func__,
         rid, result->receipt_id, result->error);
 }

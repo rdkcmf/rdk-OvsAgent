@@ -189,7 +189,8 @@ ssize_t ovsdb_socket_listen(int fd, char * buffer, size_t size, int timeout)
         }
 
         buffer[len] = 0;
-        OvsDbApiDebug("Received %zd bytes, bufSize: %zd, msg: %s\n", len, size, buffer);
+        OvsDbApiDebug("%s received %zd bytes, bufSize: %zd, msg: %s\n",
+            __func__, len, size, buffer);
     }
 
     return len;

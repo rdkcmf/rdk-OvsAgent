@@ -23,9 +23,13 @@
 
 OVS_STATUS ovsdb_init(unsigned int startingId);
 OVS_STATUS ovsdb_deinit();
-OVS_STATUS ovsdb_write(const char* rID, Rdkb_Table_Config * table_config, ovsdb_receipt_cb receipt_cb);
-OVS_STATUS ovsdb_monitor(OVS_TABLE ovsdb_table, ovsdb_mon_cb mon_cb, ovsdb_receipt_cb receipt_cb);
+OVS_STATUS ovsdb_write(const char* rID, Rdkb_Table_Config * table_config,
+    ovsdb_receipt_cb receipt_cb);
+OVS_STATUS ovsdb_monitor(OVS_TABLE ovsdb_table, ovsdb_mon_cb mon_cb,
+    ovsdb_receipt_cb receipt_cb);
 OVS_STATUS ovsdb_monitor_cancel(const char * rID, ovsdb_receipt_cb receipt_cb);
+OVS_STATUS ovsdb_delete(OVS_TABLE ovsdb_table, const char * key,
+    const char * value);
 unsigned int id_generate();
 
 #endif

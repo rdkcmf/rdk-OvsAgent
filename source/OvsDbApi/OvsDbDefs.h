@@ -29,11 +29,15 @@
 #define GATEWAY_CONFIG_TABLE_NAME "Gateway_Config"
 #define FEEDBACK_TABLE_NAME       "Feedback"
 
+#define OVSDB_TABLE_UUID     "uuid"
+#define OVSDB_TABLE_UUID_ALT "_uuid"
+
 typedef enum {
     OVSDB_UNKNOWN_RECEIPT_ID = 0,
     OVSDB_INSERT_RECEIPT_ID,
     OVSDB_MONITOR_RECEIPT_ID,
     OVSDB_MONITOR_CANCEL_RECEIPT_ID,
+    OVSDB_DELETE_RECEIPT_ID
 } OVSDB_RECEIPT_ID;
 
 #define OVSDB_BASE_RECEIPT \
@@ -60,6 +64,11 @@ typedef struct{
     OVSDB_BASE_RECEIPT;
     bool is_successful;
 } OvsDb_Monitor_Cancel_Receipt;
+
+typedef struct {
+    OVSDB_BASE_RECEIPT;
+    int count;
+} OvsDb_Delete_Receipt;
 
 typedef void (*ovsdb_receipt_cb) (const char* rID, const OvsDb_Base_Receipt* receipt_result);
 typedef ovs_interact_cb ovsdb_mon_cb;

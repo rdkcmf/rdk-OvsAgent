@@ -31,6 +31,8 @@
 */
 #define MAX_UUID_LEN        36
 
+#define FEEDBACK_REQ_UUID   "req_uuid"
+
 /**
  * @brief OVS DB Feedback table data.
  *

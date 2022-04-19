@@ -25,13 +25,13 @@
 
 char * gc_insert_to_json(Gateway_Config * config, const char * unique_id)
 {
-    json_t *js_row;
-    json_t *js_mainObj;
-    json_t *js_params;
-    json_t *js_main;
-    char * str_out = NULL;
+    json_t *js_row = NULL;
+    json_t *js_mainObj = NULL;
+    json_t *js_params = NULL;
+    json_t *js_main = NULL;
+    char *str_out = NULL;
 
-    if(config == NULL || unique_id == NULL)
+    if (!config || !unique_id)
     {
         OvsDbApiError("Unable to create JSON string because of incomplete parameters\n");
         return NULL;

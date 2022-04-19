@@ -32,6 +32,7 @@ class OvsDbApiInterface
         virtual OVS_STATUS ovsdb_write(const char *, Rdkb_Table_Config *, ovsdb_receipt_cb) = 0;
         virtual OVS_STATUS ovsdb_monitor(OVS_TABLE, ovsdb_mon_cb, ovsdb_receipt_cb) = 0;
         virtual OVS_STATUS ovsdb_monitor_cancel(const char *, ovsdb_receipt_cb) = 0;
+        virtual OVS_STATUS ovsdb_delete(OVS_TABLE, const char *, const char *) = 0;
         virtual unsigned int id_generate() = 0;
 };
 
@@ -44,6 +45,7 @@ class OvsDbApiMock : public OvsDbApiInterface
         MOCK_METHOD3(ovsdb_write, OVS_STATUS(const char *, Rdkb_Table_Config *, ovsdb_receipt_cb));
         MOCK_METHOD3(ovsdb_monitor, OVS_STATUS(OVS_TABLE, ovsdb_mon_cb, ovsdb_receipt_cb));
         MOCK_METHOD2(ovsdb_monitor_cancel, OVS_STATUS(const char *, ovsdb_receipt_cb));
+        MOCK_METHOD3(ovsdb_delete, OVS_STATUS(OVS_TABLE, const char *, const char *));
         MOCK_METHOD0(id_generate, unsigned int());
 };
 

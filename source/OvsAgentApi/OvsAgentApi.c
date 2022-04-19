@@ -138,6 +138,25 @@ static void ovs_agent_api_monitor_feedback_callback(OVS_STATUS status,
     OvsAgentApiDebug("%s: succeeded for Table: %d, Status: %d, Uuid: %s\n", __func__,
         table_config->table.id, feedback->status, feedback->req_uuid);
 
+    // delete entry in Gateway_Config table using _uuid field as key
+    if (ovsdb_delete(OVS_GW_CONFIG_TABLE, OVSDB_TABLE_UUID, feedback->req_uuid) !=
+        OVS_SUCCESS_STATUS)
+    {
+        OvsAgentApiError("%s failed to delete _uuid: %s in Table: %d\n",
+            __func__, feedback->req_uuid, OVS_GW_CONFIG_TABLE);
+        return;
+    }
+
+    // delete entry in Feedback table using req_uuid field as key
+    if (ovsdb_delete(table_config->table.id, FEEDBACK_REQ_UUID,
+        feedback->req_uuid) != OVS_SUCCESS_STATUS)
+    {
+        OvsAgentApiError("%s failed to delete %s: %s in Table: %d\n",
+            __func__, FEEDBACK_REQ_UUID, feedback->req_uuid,
+            table_config->table.id);
+        return;
+    }
+
     signal_callback_completion();
 }
 
@@ -473,13 +492,12 @@ static bool handle_monitor_insert_request(ovs_interact_request * request, ovs_in
         return false;
     }
 
-    OvsAgentApiDebug("%s Doing a ovsdb_monitor with Table: %d\n", __func__,
-        request->table_config.table.id);
+    OvsAgentApiDebug("%s Monitor Table: %d\n", __func__, request->table_config.table.id);
     status = ovsdb_monitor(request->table_config.table.id, callback, NULL);
     if (status != OVS_SUCCESS_STATUS)
     {
-        OvsAgentApiError("%s failed to do a OVS DB monitor operation for Table: %d!\n",
-            __func__,  request->table_config.table.id);
+        OvsAgentApiError("%s failed to Monitor Table: %d!\n", __func__,
+            request->table_config.table.id);
         rtn = false;
     }
 
