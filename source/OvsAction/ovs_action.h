@@ -27,7 +27,14 @@
 
 #define SYS_CLASS_NET_PATH "/sys/class/net"
 
-#define LLAN0_ETH_NAME "llan0"
+#define ETHER_TYPE_BRCM       0x886c // Broadcom Corp.
+#define ETHER_TYPE_BRCM_AIRIQ 0x88b7 // Broadcom Corp. AiriQ
+#define ETHER_TYPE_802_1X     0x888e // 802.1x
+
+#define BR106_ETH_NAME  "br106" // LnF Bridge
+#define WL0_3_ETH_NAME  "wl0.3" // LnF port
+#define BRLAN0_ETH_NAME "brlan0"
+#define LLAN0_ETH_NAME  "llan0"
 #define PUMA7_ETH1_NAME "nsgmii1.100"
 #define PUMA7_ETH2_NAME "nsgmii1.101"
 #define PUMA7_ETH1_PATH "/sys/class/net/nsgmii1.100"

@@ -547,6 +547,39 @@ static OVS_STATUS ovs_block_mso_ui_access(Gateway_Config * req)
     return OVS_SUCCESS_STATUS;
 }
 
+// Fix for RDKB-40884 on TCHXB7 and TCHXB8
+static OVS_STATUS ovs_setup_brcm_wifi_flows(Gateway_Config * req)
+{
+    int idx = 0;
+    char cmd[250] = {0};
+    const unsigned int eth_types[] =
+        {ETHER_TYPE_BRCM, ETHER_TYPE_BRCM_AIRIQ, ETHER_TYPE_802_1X};
+
+    if (!req || strlen(req->parent_bridge) == 0)
+    {
+        return OVS_FAILED_STATUS;
+    }
+
+    for (idx = 0; idx < sizeof(eth_types)/sizeof(eth_types[0]); idx++)
+    {
+        memset(cmd, 0, sizeof (cmd));
+        snprintf(cmd, 250, "ovs-ofctl --strict del-flows %s \"dl_type=0x%04x, actions=%s\"",
+            req->parent_bridge, eth_types[idx], req->parent_bridge);
+        OvsActionDebug("%s Cmd: %s\n", __func__, cmd);
+        system(cmd);
+
+        if (req->if_cmd != OVS_BR_REMOVE_CMD)
+        {
+            memset(cmd, 0, sizeof (cmd));
+            snprintf(cmd, 250, "ovs-ofctl add-flow %s \"dl_type=0x%04x, actions=%s\"",
+                req->parent_bridge, eth_types[idx], req->parent_bridge);
+            OvsActionDebug("%s Cmd: %s\n", __func__, cmd);
+            system(cmd);
+        }
+    }
+    return OVS_SUCCESS_STATUS;
+}
+
 static OVS_STATUS getExistingOvsParentBridge(char * if_name,
     char * existing_bridge, size_t size, bool * found)
 {
@@ -587,7 +620,7 @@ static OVS_STATUS getExistingOvsParentBridge(char * if_name,
         (strncmp(ovsBridgeNotFoundPrefix, existing_bridge,
             strlen(ovsBridgeNotFoundPrefix)) != 0))
     {
-        OvsActionDebug("%s found existing bridge=%s, len=%zu for %s\n",
+        OvsActionDebug("%s found existing bridge %s, len=%zu for %s\n",
             __func__, existing_bridge, strlen(existing_bridge), if_name);
         *found = true;
     }
@@ -656,7 +689,7 @@ static OVS_STATUS getExistingLinuxParentBridge(char * if_name,
     len = strlen(existing_bridge);
     if (len > 0)
     {
-        OvsActionDebug("%s found existing bridge=%s, len=%zu for %s\n",
+        OvsActionDebug("%s found existing bridge %s, len=%zu for %s\n",
             __func__, existing_bridge, len, if_name);
         *found = true;
     }
@@ -688,13 +721,13 @@ static OVS_STATUS removeExistingInterfacePort(Gateway_Config * req, bool ovs_ena
     }
     if (!found)
     {
-        OvsActionDebug("Port %s is not part of an existing bridge.\n",
-            req->if_name);
+        OvsActionDebug("%s Port %s is not part of an existing bridge.\n",
+            __func__, req->if_name);
         return status;
     }
 
-    OvsActionDebug("Port %s already exists as part of bridge %s\n",
-        req->if_name, existingBridge);
+    OvsActionDebug("%s Port %s already exists as part of bridge %s\n",
+        __func__, req->if_name, existingBridge);
     if ((strcmp(req->parent_bridge, existingBridge) == 0) &&
         (req->if_cmd == OVS_BR_REMOVE_CMD))
     {   // parent bridge and existing bridge are the SAME and
@@ -731,24 +764,36 @@ static OVS_STATUS removeExistingInterfacePort(Gateway_Config * req, bool ovs_ena
     return status;
 }
 
-static OVS_STATUS configureParentBridge(Gateway_Config * req, bool ovs_enabled)
+static OVS_STATUS configureParentBridge(Gateway_Config * req, bool ovs_enabled,
+    bool * exists)
 {
     char cmd[250] = {0};
     char ports[128] = {0};
     FILE *fp = NULL;
+    char brpath[64] = {0};
 
-    OvsActionDebug("Trying to add a port (that does not exist) to a bridge. Creating it...\n");
-//TODO: No need of explcit addition of bridge, though its harmless, every port will retrigger this
-    if (ovs_enabled)
+    if (!req || !exists)
     {
-        snprintf(cmd, 250, "ovs-vsctl add-br %s", req->parent_bridge);
+        return OVS_FAILED_STATUS;
     }
-    else
+
+    snprintf(brpath, 64, "%s/%s", SYS_CLASS_NET_PATH, req->parent_bridge);
+    *exists = (access(brpath, F_OK) == 0) ? true : false;
+    if (!*exists)
     {
-        snprintf(cmd, 250, "brctl addbr %s", req->parent_bridge);
+        OvsActionDebug("%s Adding a port for a non-existant bridge. Creating bridge...\n",
+            __func__);
+        if (ovs_enabled)
+        {
+            snprintf(cmd, 250, "ovs-vsctl add-br %s", req->parent_bridge);
+        }
+        else
+        {
+            snprintf(cmd, 250, "brctl addbr %s", req->parent_bridge);
+        }
+        OvsActionDebug("%s Cmd: %s\n", __func__, cmd);
+        system(cmd);
     }
-    OvsActionDebug("%s Cmd: %s\n", __func__, cmd);
-    system(cmd);
 
     if (req->if_cmd==OVS_IF_UP_CMD || req->if_cmd==OVS_IF_DOWN_CMD)
     {
@@ -797,6 +842,30 @@ static OVS_STATUS configureParentBridge(Gateway_Config * req, bool ovs_enabled)
     return OVS_SUCCESS_STATUS;
 }
 
+static OVS_STATUS ovs_setup_bridge_flows(Gateway_Config * req)
+{
+    OVS_STATUS status = OVS_SUCCESS_STATUS;
+
+    if (!req)
+    {
+        return OVS_FAILED_STATUS;
+    }
+
+    // sets up OpenFlow flows for bridge related flows
+    if ((g_ovsActionConfig.modelNum == OVS_CGM4331COM_MODEL) ||
+        (g_ovsActionConfig.modelNum == OVS_CGM4981COM_MODEL))
+    {
+        if ((status = ovs_setup_brcm_wifi_flows(req)) != OVS_SUCCESS_STATUS)
+        {
+            OvsActionError(
+                "%s failed to setup Broadcom wifi flows for Bridge %s, Port %s.\n",
+                __func__, req->parent_bridge, req->if_name);
+        }
+    }
+
+    return status;
+}
+
 // TODO: replace error return value 1 with right enum value
 // TODO: validate the action and then do a return
 
@@ -804,6 +873,7 @@ static OVS_STATUS ovs_modifyParentBridge(Gateway_Config * req)
 {
     OVS_STATUS status = OVS_SUCCESS_STATUS;
     bool ovsEnabled = true;
+    bool bridgeExists = false;
 
     if (!req)
     {
@@ -826,8 +896,61 @@ static OVS_STATUS ovs_modifyParentBridge(Gateway_Config * req)
 
     if (req->if_cmd != OVS_BR_REMOVE_CMD) // TODO: refactor this condition check
     {
-        status = configureParentBridge(req, ovsEnabled);
+        status = configureParentBridge(req, ovsEnabled, &bridgeExists);
+
+        if (!bridgeExists)
+        {
+            status = ovs_setup_bridge_flows(req);
+        }
     }
+    return status;
+}
+
+static OVS_STATUS ovs_setup_port_flows(Gateway_Config * req)
+{
+    OVS_STATUS status = OVS_SUCCESS_STATUS;
+
+    if (!req)
+    {
+        return OVS_FAILED_STATUS;
+    }
+
+    if ((strcmp(req->parent_bridge, BRLAN0_ETH_NAME) == 0) &&
+        (strcmp(req->if_name, LLAN0_ETH_NAME) == 0))
+    {
+        // sets up OpenFlow flows for brlan0's llan0 interface port
+        if ((g_ovsActionConfig.modelNum == OVS_CGM4140COM_MODEL) ||
+            (g_ovsActionConfig.modelNum == OVS_TG3482G_MODEL) ||
+            (g_ovsActionConfig.modelNum == OVS_CGM4331COM_MODEL) ||
+            (g_ovsActionConfig.modelNum == OVS_CGM4981COM_MODEL))
+        {
+            if ((status = ovs_setup_admin_gui_access(req)) != OVS_SUCCESS_STATUS)
+            {
+                OvsActionError(
+                    "%s failed to setup Admin GUI access flows for Bridge %s, Port %s.\n",
+                    __func__, req->parent_bridge, req->if_name);
+            }
+            if ((status = ovs_block_mso_ui_access(req)) != OVS_SUCCESS_STATUS)
+            {
+                OvsActionError(
+                    "%s failed to block MSO UI access flows for Bridge %s, Port %s.\n",
+                    __func__, req->parent_bridge, req->if_name);
+            }
+        }
+    }
+    else if ((strcmp(req->parent_bridge, BR106_ETH_NAME) == 0) &&
+        (strcmp(req->if_name, WL0_3_ETH_NAME) == 0))
+    {
+        // Workaround for br106 to add flows, due to a previous hostapd hack which
+        // bypasses our OvsAgentApi on calls to add-br for br106, br112, br113
+        // so OvsAgentApi is NOT being used to create and add (add-br) these
+        // bridges to ovs. Therefore we have now resorted to this hack to add
+        // the bridge level flows butt by basing it on one of its ports, at the
+        // port level. TODO: Refactor when new api is designed which adds an array
+        // of bridge ports in one api call.
+        status = ovs_setup_bridge_flows(req);
+    }
+
     return status;
 }
 
@@ -878,6 +1001,9 @@ static OVS_STATUS ovs_createBridge(Gateway_Config * req)
         OvsActionDebug("%s Cmd: %s\n", __func__, cmd);
         system(cmd);
     }
+
+    // setup bridge related flows at bridge creation
+    status = ovs_setup_bridge_flows(req);
 
     return status;
 }
@@ -1022,27 +1148,7 @@ static OVS_STATUS ovs_addPort(Gateway_Config * req)
             return status;
         }
 
-        // sets up OpenFlow flows for brlan0's llan0 interface port
-        if (((g_ovsActionConfig.modelNum == OVS_CGM4140COM_MODEL) ||
-            (g_ovsActionConfig.modelNum == OVS_TG3482G_MODEL) ||
-            (g_ovsActionConfig.modelNum == OVS_CGM4331COM_MODEL) ||
-            (g_ovsActionConfig.modelNum == OVS_CGM4981COM_MODEL)) &&
-            (strcmp(req->parent_bridge, "brlan0") == 0) &&
-            (strcmp(req->if_name, LLAN0_ETH_NAME) == 0))
-        {
-            if ((status = ovs_setup_admin_gui_access(req)) != OVS_SUCCESS_STATUS)
-            {
-                OvsActionError(
-                    "%s failed to setup Admin GUI access flows for Bridge %s, Port %s.\n",
-                    __func__, req->parent_bridge, req->if_name);
-            }
-            if ((status = ovs_block_mso_ui_access(req)) != OVS_SUCCESS_STATUS)
-            {
-                OvsActionError(
-                    "%s failed to block MSO UI access flows for Bridge %s, Port %s.\n",
-                    __func__, req->parent_bridge, req->if_name);
-            }
-        }
+        status = ovs_setup_port_flows(req);
     }
     return status;
 }

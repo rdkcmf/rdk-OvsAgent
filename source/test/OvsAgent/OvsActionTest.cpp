@@ -169,6 +169,8 @@ TEST_F(OvsActionTestFixture, ovs_action_add_vlan_up_valid)
     const std::string ifName = "pgd0-91.200";
     const std::string vlanId = "200";
     const std::string parentBridge = "dummy";
+    const std::string expectedBrPath = std::string(SYS_CLASS_NET_PATH) + "/" +
+        parentBridge;
     const std::string expectedParentBridgeCmd = "ovs-vsctl iface-to-br " + ifName;
     const std::string expectedBridgePortsCmd = "ovs-vsctl list-ports " + parentBridge;
     //char expectedParentBridge[] = "dummy\n";
@@ -230,6 +232,10 @@ TEST_F(OvsActionTestFixture, ovs_action_add_vlan_up_valid)
             .WillOnce(Return(1));
     }
 
+    EXPECT_CALL(*g_utilsMock, access(StrEq(expectedBrPath), _))
+        .Times(1)
+        .WillOnce(Return(-1));
+
     EXPECT_CALL(*g_utilsMock, getenv(StrEq(MODEL_NUM)))
         .Times(1)
         .WillOnce(Return(expectedModel));
@@ -254,6 +260,8 @@ TEST_P(GatewayConfigTest, ovs_action_setup_linux_bridge_valid)
     const int vlanId = cfg.vlan_id;
     const std::string parentBridge = GetParam().parent_bridge;
 
+    const std::string expectedBrPath = std::string(SYS_CLASS_NET_PATH) + "/" +
+        parentBridge;
     const std::string expectedIfPath = std::string(SYS_CLASS_NET_PATH) + "/" +
         ifName + LINUX_BRPORT_POSTFIX_PATH;
     const std::string expectedParentBridgeCmd = "cat " + expectedIfPath;
@@ -316,6 +324,11 @@ TEST_P(GatewayConfigTest, ovs_action_setup_linux_bridge_valid)
             .Times(1)
             .WillOnce(Return(1));
     }
+
+    EXPECT_CALL(*g_utilsMock, access(StrEq(expectedBrPath), _))
+        .Times(1)
+        .WillOnce(Return(-1));
+
     EXPECT_CALL(*g_utilsMock, access(StrEq(expectedIfPath), _))
         .Times(1)
         .WillOnce(Return(0));
@@ -332,7 +345,7 @@ TEST_P(GatewayConfigTest, ovs_action_setup_linux_bridge_valid)
     EXPECT_EQ(OVS_SUCCESS_STATUS, ovs_action_gateway_config(&cfg));
 }
 
-INSTANTIATE_TEST_SUITE_P(Default, GatewayConfigTest,
+INSTANTIATE_TEST_SUITE_P(GatewayConfigTestSuite, GatewayConfigTest,
     ::testing::Values(
         Gateway_Config{"gretap0.102", "", "", "", "", "gretap0", "brlan2", 1500, 102, OVS_VLAN_IF_TYPE, OVS_IF_UP_CMD},
         Gateway_Config{"ath4", "", "", "", "", "", "brlan2", 1500, 0, OVS_OTHER_IF_TYPE, OVS_IF_UP_CMD}));
@@ -431,6 +444,8 @@ TEST_F(OvsActionTestFixture, ovs_action_add_port_to_bridge_valid)
     const OVS_CMD     ifCmd = OVS_IF_UP_CMD;
     const std::string ifName = "ath0";
     const std::string parentBridge = "brlan0";
+    const std::string expectedBrPath = std::string(SYS_CLASS_NET_PATH) + "/" +
+        parentBridge;
     const std::string expectedParentBridgeCmd = "ovs-vsctl iface-to-br " + ifName;
     const std::string expectedBridgePortsCmd = "ovs-vsctl list-ports " + parentBridge;
     char expectedParentBridge[] = "brlan0\n";
@@ -489,6 +504,10 @@ TEST_F(OvsActionTestFixture, ovs_action_add_port_to_bridge_valid)
             .WillOnce(Return(1));
     }
 
+    EXPECT_CALL(*g_utilsMock, access(StrEq(expectedBrPath), _))
+        .Times(1)
+        .WillOnce(Return(-1));
+
     EXPECT_CALL(*g_utilsMock, getenv(StrEq(MODEL_NUM)))
         .Times(1)
         .WillOnce(Return(expectedModel));
@@ -524,6 +543,8 @@ TEST_P(ModelNumBasedTestFixture, ovs_action_add_http_llan0_port_in_bridge_mode)
     const OVS_CMD     ifCmd = OVS_IF_UP_CMD;
     const std::string ifName = "llan0";
     const std::string parentBridge = "brlan0";
+    const std::string expectedBrPath = std::string(SYS_CLASS_NET_PATH) + "/" +
+        parentBridge;
     const char expectedIP[] = "10.0.0.1";
     char expectedCMIP[] = "2001:558:4000:a0:82d0:4aff:fed1:faad";
     char expectedParamName[] = "Device.DeviceInfo.X_COMCAST-COM_CM_IP";
@@ -548,7 +569,6 @@ TEST_P(ModelNumBasedTestFixture, ovs_action_add_http_llan0_port_in_bridge_mode)
 
     std::vector<std::string> expectedCmds;
     expectedCmds.push_back("ifconfig " + ifName + " up");
-    expectedCmds.push_back("ovs-vsctl add-br " + parentBridge);
     expectedCmds.push_back("ifconfig " + parentBridge + " up");
     expectedCmds.push_back("ovs-vsctl add-port " + parentBridge + " " + ifName);
     expectedCmds.push_back("ovs-ofctl --strict del-flows " + parentBridge + " arp,nw_dst=" + expectedIP + "/32");
@@ -618,6 +638,11 @@ TEST_P(ModelNumBasedTestFixture, ovs_action_add_http_llan0_port_in_bridge_mode)
             .WillOnce(Return(1));
     }
 
+    // Parent bridge already exists
+    EXPECT_CALL(*g_utilsMock, access(StrEq(expectedBrPath), _))
+        .Times(1)
+        .WillOnce(Return(0));
+
     EXPECT_CALL(*g_utilsMock, getenv(StrEq(MODEL_NUM)))
         .Times(1)
         .WillOnce(Return(expectedModel));
@@ -657,7 +682,7 @@ TEST_P(ModelNumBasedTestFixture, ovs_action_add_http_llan0_port_in_bridge_mode)
     delete[] pExpectedParamValues;
 }
 
-INSTANTIATE_TEST_SUITE_P(AddHttpLlan0PortInBridgeModeOvsActionTests, ModelNumBasedTestFixture,
+INSTANTIATE_TEST_SUITE_P(PlatformSpecificOvsActionTests, ModelNumBasedTestFixture,
     ::testing::Values((char*)"CGM4140COM", (char*)"TG3482G",
                       (char*)"CGM4331COM", (char*)"CGM4981COM"));
 
@@ -736,6 +761,8 @@ TEST_F(OvsActionTestFixture, ovs_action_setup_eth_switch_port1_axb6)
     const std::string ifName = PUMA7_ETH1_NAME;
     const std::string parentBridge = "brlan0";
     const std::string vlan = "100";
+    const std::string expectedBrPath = std::string(SYS_CLASS_NET_PATH) + "/" +
+        parentBridge;
     const char expectedIP[] = "10.0.0.1";
     FILE * expectedFd1 = (FILE *)0xffffffff;
     FILE * expectedFd2 = (FILE *)0xfffffffe;
@@ -800,6 +827,10 @@ TEST_F(OvsActionTestFixture, ovs_action_setup_eth_switch_port1_axb6)
             .WillOnce(Return(1));
     }
 
+    EXPECT_CALL(*g_utilsMock, access(StrEq(expectedBrPath), _))
+        .Times(1)
+        .WillOnce(Return(-1));
+
     EXPECT_CALL(*g_utilsMock, access(StrEq(expectedIfPath), _))
         .Times(1)
         .WillOnce(Return(0));
@@ -824,6 +855,8 @@ TEST_F(OvsActionTestFixture, ovs_action_setup_eth_switch_port2_axb6)
     const std::string ifName = PUMA7_ETH2_NAME;
     const std::string parentBridge = "brlan1";
     const std::string vlan = "101";
+    const std::string expectedBrPath = std::string(SYS_CLASS_NET_PATH) + "/" +
+        parentBridge;
     const char expectedIP[] = "172.16.12.1";
     FILE * expectedFd0 = (FILE *)0xffffffff;
     FILE * expectedFd1 = (FILE *)0xfffffffe;
@@ -899,6 +932,10 @@ TEST_F(OvsActionTestFixture, ovs_action_setup_eth_switch_port2_axb6)
             .WillOnce(Return(1));
     }
 
+    EXPECT_CALL(*g_utilsMock, access(StrEq(expectedBrPath), _))
+        .Times(1)
+        .WillOnce(Return(-1));
+
     EXPECT_CALL(*g_utilsMock, access(StrEq(expectedIfPath), _))
         .Times(1)
         .WillOnce(Return(0));
@@ -922,6 +959,8 @@ TEST_F(OvsActionTestFixture, ovs_action_setup_eth_switch_xhs_port2_axb6)
     const OVS_CMD     ifCmd = OVS_IF_UP_CMD;
     const std::string ifName = PUMA7_ETH2_NAME;
     const std::string parentBridge = "brlan1";
+    const std::string expectedBrPath = std::string(SYS_CLASS_NET_PATH) + "/" +
+        parentBridge;
     const char expectedIP[] = "172.16.12.1";
     FILE * expectedFd0 = (FILE *)0xffffffff;
     FILE * expectedFd1 = (FILE *)0xfffffffe;
@@ -1007,10 +1046,115 @@ TEST_F(OvsActionTestFixture, ovs_action_setup_eth_switch_xhs_port2_axb6)
             .WillOnce(Return(1));
     }
 
+    EXPECT_CALL(*g_utilsMock, access(StrEq(expectedBrPath), _))
+        .Times(1)
+        .WillOnce(Return(-1));
     EXPECT_CALL(*g_utilsMock, access(StrEq(expectedBrlan0PortPath), _))
         .Times(1)
         .WillOnce(Return(0));
     EXPECT_CALL(*g_utilsMock, access(StrEq(expectedIfPath), _))
+        .Times(1)
+        .WillOnce(Return(0));
+
+    EXPECT_CALL(*g_utilsMock, getenv(StrEq(MODEL_NUM)))
+        .Times(1)
+        .WillOnce(Return(expectedModel));
+
+    EXPECT_CALL(*g_syscfgMock, SyscfgInit())
+        .Times(1)
+        .WillOnce(Return(0));
+
+    EXPECT_EQ(OVS_SUCCESS_STATUS, ovs_action_init());
+    EXPECT_EQ(OVS_SUCCESS_STATUS, ovs_action_gateway_config(&cfg));
+}
+
+TEST_P(ModelNumBasedTestFixture, ovs_action_add_brcm_wifi_flows_test)
+{
+    const OVS_IF_TYPE ifType = OVS_OTHER_IF_TYPE;
+    const OVS_CMD     ifCmd = OVS_IF_UP_CMD;
+    const std::string ifName = WL0_3_ETH_NAME;
+    const std::string parentBridge = BR106_ETH_NAME;
+    const std::string expectedBrPath = std::string(SYS_CLASS_NET_PATH) + "/" +
+        parentBridge;
+    FILE * expectedFd1 = (FILE *)0xffffffff;
+    FILE * expectedFd2 = (FILE *)0xfffffffe;
+    const std::string expectedParentBridgeCmd = "ovs-vsctl iface-to-br " + ifName;
+    const std::string expectedBridgePortsCmd = "ovs-vsctl list-ports " + parentBridge;
+    char expectedParentBridge[] = "br106\n";
+    char expectedBridgePorts[] = "wl0.3\n";
+    char * expectedModel = GetParam();
+    const unsigned int eth_types[] =
+        {ETHER_TYPE_BRCM, ETHER_TYPE_BRCM_AIRIQ, ETHER_TYPE_802_1X};
+
+    std::vector<std::string> expectedCmds;
+    expectedCmds.push_back("ifconfig " + ifName + " up");
+    expectedCmds.push_back("ifconfig " + parentBridge + " up");
+    expectedCmds.push_back("ovs-vsctl add-port " + parentBridge + " " + ifName);
+
+    if ((strcmp(expectedModel, "CGM4331COM") == 0) ||
+        (strcmp(expectedModel, "CGM4981COM") == 0))
+    {
+        for (int idx = 0; idx < sizeof(eth_types)/sizeof(eth_types[0]); idx++)
+        {
+            std::stringstream ethType;
+            ethType << std::hex << eth_types[idx];
+            expectedCmds.push_back("ovs-ofctl --strict del-flows " + parentBridge +
+                " \"dl_type=0x" + ethType.str() + ", actions=" + parentBridge + "\"");
+            expectedCmds.push_back("ovs-ofctl add-flow " + parentBridge +
+                " \"dl_type=0x" + ethType.str() + ", actions=" + parentBridge + "\"");
+        }
+    }
+
+    Gateway_Config cfg = {0};
+    cfg.if_type = ifType;
+    cfg.if_cmd = ifCmd;
+    strcpy(cfg.if_name, const_cast<char *>(ifName.c_str()));
+    strcpy(cfg.parent_bridge, const_cast<char *>(parentBridge.c_str()));
+
+    EXPECT_CALL(*g_fileIOMock, popen(StrEq(expectedParentBridgeCmd), StrEq("r")))
+       .Times(1)
+       .WillOnce(::testing::Return(expectedFd1));
+    EXPECT_CALL(*g_fileIOMock, popen(StrEq(expectedBridgePortsCmd), StrEq("r")))
+       .Times(1)
+       .WillOnce(::testing::Return(expectedFd2));
+
+    EXPECT_CALL(*g_fileIOMock, pclose(expectedFd1))
+       .Times(1)
+       .WillOnce(::testing::Return(0));
+    EXPECT_CALL(*g_fileIOMock, pclose(expectedFd2))
+       .Times(1)
+       .WillOnce(::testing::Return(0));
+
+    EXPECT_CALL(*g_fileIOMock, fgets(_, _, expectedFd1))
+        .Times(2)
+        .WillOnce(::testing::DoAll(
+            SetArgNPointeeTo<0>(std::begin(expectedParentBridge), sizeof(expectedParentBridge)),
+            ::testing::Return((char*)expectedParentBridge)
+        ))
+        .WillOnce(::testing::ReturnNull());
+    EXPECT_CALL(*g_fileIOMock, fgets(_, _, expectedFd2))
+        .Times(2)
+        .WillOnce(::testing::DoAll(
+            SetArgNPointeeTo<0>(std::begin(expectedBridgePorts), sizeof(expectedBridgePorts)),
+            ::testing::Return((char*)expectedBridgePorts)
+        ))
+        .WillOnce(::testing::ReturnNull());
+
+    EXPECT_CALL(*g_utilsMock, system(_))
+        .Times(0);
+    for (size_t idx=0; idx<expectedCmds.size(); idx++)
+    {
+        std::cout << "Expected " << expectedCmds.at(idx) << std::endl;
+        EXPECT_CALL(*g_utilsMock, system(StrEq(expectedCmds.at(idx))))
+            .Times(1)
+            .WillOnce(Return(1));
+    }
+
+    // On TCHXB7/8 only, if bridge doesn't exist, also create the wifi related
+    // ether_type ovs flow rules to send those packets to the bridge only. But
+    // lnf is a special case, since br106, brlan112, brlan113 are created else-
+    // where and not via the OvsAgentApi.
+    EXPECT_CALL(*g_utilsMock, access(StrEq(expectedBrPath), _))
         .Times(1)
         .WillOnce(Return(0));
 
