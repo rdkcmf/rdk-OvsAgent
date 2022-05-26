@@ -18,7 +18,13 @@
 #
 
 
-OPENSYNC_ENABLE=`syscfg get opensync_enable`
+OPENSYNC_ENABLE="`syscfg get opensync`"
+OPENSYNC_ENABLE_LEGACY="`syscfg get opensync_enable`"
+if [ "$OPENSYNC_ENABLE" != "true" ] && [ "$OPENSYNC_ENABLE_LEGACY" == "true" ]; then
+    OPENSYNC_ENABLE="true"
+    syscfg set "opensync" "true"
+    syscfg commit
+fi
 if [ $# -eq 0 ]; then
  echo "No arguments passed"
  exit 0
