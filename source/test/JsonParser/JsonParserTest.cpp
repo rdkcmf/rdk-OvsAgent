@@ -83,33 +83,50 @@ MATCHER_P(JsonMatch, n, "")
 
 MATCHER_P(RdkbTableMatch, n, "")
 {
-    bool ret = true;
-    if(n->table.id != arg->table.id)
+    bool ret = false;
+
+    if (n->table.id != arg->table.id)
     {
         return false;
     }
 
-    switch(n->table.id)
+    switch (n->table.id)
     {
         case OVS_FEEDBACK_TABLE:
+        {
+            Feedback * n_fb = (Feedback*) n->config;
+            Feedback * args_fb = (Feedback*) arg->config;
+            if ((n_fb->status == args_fb->status) &&
+                (strcmp(n_fb->req_uuid, args_fb->req_uuid) == 0))
             {
-                Feedback * n_fb = (Feedback*) n->config;
-                Feedback * args_fb = (Feedback*) arg->config;
-                if(n_fb->status != args_fb->status)
-                {
-                    ret = false;
-                }
-                else if(strcmp(n_fb->req_uuid, args_fb->req_uuid) != 0)
-                {
-                    ret = false;
-                }
-                break;
+                ret = true;
             }
+            else
+            {
+                ret = false;
+            }
+            break;
+        }
+        case OVS_GW_CONFIG_TABLE:
+        {
+              int idx;
+              char* n_gwcfg = (char*) n->config;
+              char* args_gwcfg = (char*) arg->config;
+              ret = true;
+              for (idx=0;idx<sizeof(Gateway_Config);idx++)
+              {
+                  if (n_gwcfg[idx] != args_gwcfg[idx])
+                  {
+                      ret = false;
+                      break;
+                  }
+              }
+              break;
+        }
         default:
             ret = false;
             break;
     }
-
     return ret;
 }
 
@@ -125,7 +142,7 @@ TEST_F(JsonParserTestFixture, insert_receipt_test)
     EXPECT_EQ(OVS_SUCCESS_STATUS, ovsdb_parse_msg(example_receipt.c_str(), example_receipt.length()));
 }
 
-TEST_F(JsonParserTestFixture, monitor_update_test)
+TEST_F(JsonParserTestFixture, monitor_update_new_feedback_req_test)
 {
     const std::string example_update = "{\"id\":null,\"method\":\"update\",\"params\":[\"2\",{\"Feedback\":{\"e4bb63ed-988a-4951-848f-d8374f4972fd\":{\"new\":{\"_version\":[\"uuid\",\"570e2da2-2adb-4dd7-bc2d-944d065c53c0\"],\"req_uuid\":\"18ca5061-c9ef-42dc-9579-f9e3167a1ae7\",\"status\":0}}}}]}";
     const char * expected_uuid = "2";
@@ -158,4 +175,20 @@ TEST(JsonParserTest, delete_feedback_req_uuid_test)
     EXPECT_EQ(expected_json_str,
         ovsdb_delete_to_json(OVS_FEEDBACK_TABLE, "null", "req_uuid",
             "59702df5-c44a-4d44-a34c-4ade23ed7e2d"));
+}
+
+TEST_F(JsonParserTestFixture, monitor_update_old_and_new_gw_config_reqs_test)
+{
+    const std::string example_update = "{\"id\":null,\"method\":\"update\",\"params\":[\"2001\",{\"Gateway_Config\":{\"3c55d061-0942-4470-a99e-d37b0f243e4c\":{\"old\":{\"if_name\":\"pgd0-167.100\",\"_version\":[\"uuid\",\"576e9889-9cb9-4311-8517-6dd7980c89e1\"],\"mtu\":1500,\"parent_ifname\":\"\",\"if_type\":0,\"parent_bridge\":\"brlan0\",\"gre_ifname\":\"null\",\"vlan_id\":0,\"netmask\":\"\",\"if_cmd\":0,\"gre_remote_inet_addr\":\"\",\"gre_local_inet_addr\":\"\",\"inet_addr\":\"\"}},\"8a5caead-d266-422c-a184-1848a7fbff7d\":{\"new\":{\"if_name\":\"pgd0-167.101\",\"_version\":[\"uuid\",\"f44cda22-5809-4409-ad4d-27d28b5e0d77\"],\"mtu\":1500,\"parent_ifname\":\"\",\"if_type\":0,\"parent_bridge\":\"brlan1\",\"gre_ifname\":\"null\",\"vlan_id\":0,\"netmask\":\"\",\"if_cmd\":0,\"gre_remote_inet_addr\":\"\",\"gre_local_inet_addr\":\"\",\"inet_addr\":\"\"}}}}]}";
+    const char * expected_uuid = "2001";
+    Gateway_Config gc = {"pgd0-167.101", "", "", "", "", "", "brlan1", 1500, 0, OVS_OTHER_IF_TYPE, OVS_IF_UP_CMD};
+
+    Rdkb_Table_Config expected_table_config;
+    expected_table_config.table.id = OVS_GW_CONFIG_TABLE;
+    expected_table_config.config = &gc;
+
+    EXPECT_CALL(*g_jsonParserMock, mon_list_process(StrEq(expected_uuid), RdkbTableMatch(&expected_table_config)))
+        .WillOnce(Return(OVS_SUCCESS_STATUS));
+
+    EXPECT_EQ(OVS_SUCCESS_STATUS, ovsdb_parse_msg(example_update.c_str(), example_update.length()));
 }

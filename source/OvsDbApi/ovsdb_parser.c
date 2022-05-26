@@ -344,58 +344,69 @@ static OVS_STATUS ovsdb_parse_params(json_t* params)
 static OVS_STATUS ovsdb_parse_monitor_update(const char * uuid, json_t* update)
 {
     OVS_STATUS status = OVS_FAILED_STATUS;
-    OvsAgent_Table_Config table_config = { 0 };
     char* str_json = NULL;
 
     str_json = json_dumps(update, JSON_COMPACT);
-    OvsDbApiDebug("%s UUID: %s, update: %s\n", __func__, uuid, str_json);
+    OvsDbApiDebug("%s UUID: %s, %s\n", __func__, uuid, str_json);
     free(str_json);
 
-    if(json_object_size(update) != 1)
+    if (json_object_size(update) != 1)
     {
         OvsDbApiError("%s as the size of the update object isn't 1\n",
             __func__);
         return OVS_FAILED_STATUS;
     }
 
-    //TODO: Make new abstraction to handle 'old' updates and things, not just 'new'
-
     void* iter = json_object_iter(update);
-    const char * table_name = json_object_iter_key(iter);
+    const char* table_name = json_object_iter_key(iter);
     json_t* table_value = json_object_iter_value(iter);
 
-    void* iter2 = json_object_iter(table_value);
-    const char * table_uuid = json_object_iter_key(iter2);
-    json_t* outer_uuid = json_object_iter_value(iter2);
-
-    json_t* new = json_object_get(outer_uuid, "new");
-    if (!new)
-    {   // handles and discards an update of type 'old' i.e. delete requests
-        OvsDbApiWarning("%s ignoring monitor update with UUID: %s!\n",
-            __func__, uuid);
-        return OVS_SUCCESS_STATUS;
-    }
-
-    strncpy(table_config.uuid, table_uuid, sizeof(table_config.uuid));
-    table_config.uuid[ sizeof(table_config.uuid)-1 ] = '\0';
-
-    status = parse_table(table_name, new, (Rdkb_Table_Config*) &table_config);
-    if(status != OVS_SUCCESS_STATUS)
+    void* update_iter = json_object_iter(table_value);
+    while (update_iter)
     {
-        OvsDbApiError("%s failed to parse local structure for UUID: %s.\n",
-            __func__, uuid);
-        return status;
+        const char* update_uuid = json_object_iter_key(update_iter);
+        json_t* value = json_object_iter_value(update_iter);
+
+        void* value_iter = json_object_iter(value);
+        const char* update_type = json_object_iter_key(value_iter);
+        OvsDbApiDebug("%s Table %s uuid=%s, type=%s\n", __func__,
+            table_name, update_uuid, update_type);
+
+        json_t* new_update = json_object_get(value, "new");
+        if (!new_update)
+        {   // handles and discards an update of type 'old' i.e. delete requests
+            OvsDbApiWarning(
+                "%s UUID: %s - Ignoring %s monitor update. Inner UUID: %s, Type %s!\n",
+                __func__, uuid, table_name, update_uuid, update_type);
+            status = OVS_SUCCESS_STATUS;
+        }
+        else
+        {
+            OvsAgent_Table_Config table_config = { 0 };
+
+            strncpy(table_config.uuid, update_uuid, sizeof(table_config.uuid));
+            table_config.uuid[ sizeof(table_config.uuid)-1 ] = '\0';
+
+            status = parse_table(table_name, new_update, (Rdkb_Table_Config*) &table_config);
+            if(status != OVS_SUCCESS_STATUS)
+            {
+                OvsDbApiError("%s failed to parse local structure for UUID: %s.\n",
+                    __func__, uuid);
+                return status;
+            }
+
+            status = mon_list_process(uuid, (Rdkb_Table_Config*)&table_config);
+            if (status != OVS_SUCCESS_STATUS)
+            {
+                OvsDbApiError("%s failed to process monitor update for UUID: %s.\n",
+                    __func__, uuid);
+            }
+
+            free(table_config.config);
+       }
+
+       update_iter = json_object_iter_next(table_value, update_iter);
     }
 
-    status = mon_list_process(uuid, (Rdkb_Table_Config*)&table_config);
-    if(status != OVS_SUCCESS_STATUS)
-    {
-        OvsDbApiError("%s failed to process monitor update for UUID: %s.\n",
-            __func__, uuid);
-        goto cleanup;
-    }
-
-cleanup:
-    free(table_config.config);
     return status;
 }
