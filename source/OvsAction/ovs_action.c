@@ -735,9 +735,11 @@ static OVS_STATUS removeExistingInterfacePort(Gateway_Config * req, bool ovs_ena
         removePort = true;
     }
     else if ((strcmp(req->parent_bridge, existingBridge) != 0) &&
-        ((req->if_cmd == OVS_IF_UP_CMD) || (req->if_cmd == OVS_BR_REMOVE_CMD)))
+        (req->if_cmd == OVS_IF_UP_CMD))
     {   // parent bridge and existing bridge are different and
-        // command is to bring the interface up or to remove the bridge
+        // command is to bring the interface up but from a different
+        // bridge, without having to first delete the port from the
+        // other bridge, and then add it to this bridge
         removePort = true;
     }
 
