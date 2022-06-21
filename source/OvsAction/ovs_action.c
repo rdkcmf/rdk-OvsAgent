@@ -802,9 +802,18 @@ static OVS_STATUS ovs_createVlan(Gateway_Config * req)
 
     if (strlen(req->parent_ifname))
     {
-        snprintf(cmd, 250, "vconfig add %s %d", req->parent_ifname, req->vlan_id);
-        OvsActionDebug("%s Cmd: %s\n", __func__, cmd);
-        system(cmd);
+        if (g_ovsActionConfig.modelNum == OVS_TG3482G_MODEL)
+        {
+            snprintf(cmd, 250, "  ip link add link %s %s type vlan proto 802.1Q id %d", req->parent_ifname, req->if_name, req->vlan_id);
+            OvsActionInfo("%s Cmd: %s\n", __func__, cmd);
+            system(cmd);
+        }
+	else
+        {
+            snprintf(cmd, 250, "vconfig add %s %d", req->parent_ifname, req->vlan_id);
+            OvsActionDebug("%s Cmd: %s\n", __func__, cmd);
+            system(cmd);
+        }
     }
 
     if (req->if_cmd==OVS_IF_UP_CMD || req->if_cmd==OVS_IF_DOWN_CMD)
