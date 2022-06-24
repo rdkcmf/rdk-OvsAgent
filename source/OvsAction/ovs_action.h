@@ -35,6 +35,11 @@
 #define PUMA7_PORT1_NAME "eth_0"
 #define PUMA7_PORT2_NAME "eth_1"
 
+#define ETH_BHAUL_IF_NAME "ethsw123"
+#define ETH_BHAUL_BR_NAME "brebhaul"
+#define ETH_BHAUL_IF_PATH "/sys/class/net/ethsw123"
+#define ETH_BHAUL_VLAN    "123"
+
 #define LINUX_INTERFACE_PREFIX "INTERFACE="
 #define LINUX_BRPORT_POSTFIX_PATH "/brport/bridge/uevent"
 
