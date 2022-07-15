@@ -46,6 +46,7 @@ class OvsActionTestFixture : public ::testing::Test {
         FileIOMock mockedFileIO;
         SyscfgMock mockedSyscfg;
         CosaMock mockedCosa;
+        char expOneWifiEnabledProperty[8] = "false";
 
         OvsActionTestFixture()
         {
@@ -53,6 +54,10 @@ class OvsActionTestFixture : public ::testing::Test {
             g_fileIOMock = &mockedFileIO;
             g_syscfgMock = &mockedSyscfg;
             g_cosaMock = &mockedCosa;
+
+            EXPECT_CALL(*g_utilsMock, getenv(StrEq(ONE_WIFI_ENABLED)))
+                .Times(1)
+                .WillOnce(Return(expOneWifiEnabledProperty));
         }
         virtual ~OvsActionTestFixture()
         {
@@ -1227,7 +1232,7 @@ TEST_P(ModelNumBasedTestFixture, ovs_action_add_brcm_wifi_flows_test)
         .Times(0);
     for (size_t idx=0; idx<expectedCmds.size(); idx++)
     {
-        std::cout << "Expected " << expectedCmds.at(idx) << std::endl;
+        //std::cout << "Expected " << expectedCmds.at(idx) << std::endl;
         EXPECT_CALL(*g_utilsMock, system(StrEq(expectedCmds.at(idx))))
             .Times(1)
             .WillOnce(Return(1));

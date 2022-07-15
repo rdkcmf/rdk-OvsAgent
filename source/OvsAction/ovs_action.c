@@ -32,6 +32,7 @@
 typedef struct ovs_action_config
 {
     OVS_DEVICE_MODEL modelNum; // RDKB Device Model Number
+    bool             oneWifiEnabled;
 } ovs_action_config;
 
 static ovs_action_config g_ovsActionConfig = {0};
@@ -97,6 +98,16 @@ static bool SetModelNum(const char * model_num, ovs_action_config * config)
         OvsActionError("Failed to lookup Model Number!\n");
     }
     return rtn;
+}
+
+static bool SetOneWifiEnabled(const char * enabled, ovs_action_config * config)
+{
+    if (!config)
+    {
+        return false;
+    }
+    config->oneWifiEnabled = (enabled && (strcmp(enabled, "true") == 0)) ? true : false;
+    return true;
 }
 
 static char * getVlanFromInterfaceName(const char *ifName)
@@ -562,6 +573,13 @@ static OVS_STATUS ovs_setup_brcm_wifi_flows(Gateway_Config * req)
 
     for (idx = 0; idx < sizeof(eth_types)/sizeof(eth_types[0]); idx++)
     {
+        if (g_ovsActionConfig.oneWifiEnabled && eth_types[idx] == ETHER_TYPE_802_1X)
+        {   // If OneWifi is enabled (at compile time), do not setup 802.1X ovs flow.
+            OvsActionDebug("%s Skipping OVS flow for Ether Type 0x%04x\n",
+                __func__, eth_types[idx]);
+            continue;
+        }
+
         memset(cmd, 0, sizeof (cmd));
         snprintf(cmd, 250, "ovs-ofctl --strict del-flows %s \"dl_type=0x%04x, actions=%s\"",
             req->parent_bridge, eth_types[idx], req->parent_bridge);
@@ -1035,7 +1053,7 @@ static OVS_STATUS ovs_createVlan(Gateway_Config * req)
             OvsActionInfo("%s Cmd: %s\n", __func__, cmd);
             system(cmd);
         }
-	else
+        else
         {
             snprintf(cmd, 250, "vconfig add %s %d", req->parent_ifname, req->vlan_id);
             OvsActionDebug("%s Cmd: %s\n", __func__, cmd);
@@ -1160,7 +1178,14 @@ OVS_STATUS ovs_action_init()
     const char * model_num = getenv(MODEL_NUM);
     if (!SetModelNum(model_num, &g_ovsActionConfig))
     {
-        OvsActionError("%s failed to set Model Number.\n", __func__);
+        OvsActionError("%s failed to set Model Number property.\n", __func__);
+        return OVS_FAILED_STATUS;
+    }
+
+    const char * one_wifi_enabled = getenv(ONE_WIFI_ENABLED);
+    if (!SetOneWifiEnabled(one_wifi_enabled, &g_ovsActionConfig))
+    {
+        OvsActionError("%s failed to set One Wifi Enabled property.\n", __func__);
         return OVS_FAILED_STATUS;
     }
 
@@ -1171,8 +1196,9 @@ OVS_STATUS ovs_action_init()
         return OVS_FAILED_STATUS;
     }
 
-    OvsActionInfo("%s successfully initialized for Model Number %d (%s)\n",
-        __func__, g_ovsActionConfig.modelNum, model_num);
+    OvsActionInfo(
+        "%s successfully initialized for Model Number %d (%s), OneWifiEnabled=%d\n",
+        __func__, g_ovsActionConfig.modelNum, model_num, g_ovsActionConfig.oneWifiEnabled);
     return OVS_SUCCESS_STATUS;
 }
 

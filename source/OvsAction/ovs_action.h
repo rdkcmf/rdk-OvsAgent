@@ -23,7 +23,8 @@
 #include "gateway_config.h"
 #include "feedback.h"
 
-#define MODEL_NUM      "MODEL_NUM"  // from /etc/device.properties
+#define MODEL_NUM        "MODEL_NUM"      // from /etc/device.properties
+#define ONE_WIFI_ENABLED "OneWiFiEnabled" // from /etc/device.properties
 
 #define SYS_CLASS_NET_PATH "/sys/class/net"
 
