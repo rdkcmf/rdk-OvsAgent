@@ -29,7 +29,7 @@ if [ $# -eq 0 ]; then
  echo "No arguments passed"
  exit 0
 else
- if [ "$OPENSYNC_ENABLE" == "true" ];then
+ if [ "$OPENSYNC_ENABLE" == "true" ] || [ "$OneWiFiEnabled" == "true" ];then
   /usr/opensync/scripts/managers.init $@
  else
   /usr/plume/scripts/managers.init $@

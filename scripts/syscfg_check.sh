@@ -17,7 +17,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-if [ "`syscfg get $SYSCFG_OVS`" != "true" ];then
+if [ "`syscfg get $SYSCFG_OVS`" != "true" ] && [ "$OneWiFiEnabled" != "true" ];then
     echo "$SYSCFG_OVS is disabled"
     touch /tmp/ovsagent_initialized
     exit 0

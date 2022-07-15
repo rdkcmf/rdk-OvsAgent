@@ -21,6 +21,7 @@ Description=Ovs Db Server service
 
 [Service]
 Type=forking
+EnvironmentFile=/etc/device.properties
 ExecStart=/usr/ccsp/ovsagent/OvsAgent_ovsdb-server_check.sh ovs-start bootup
 ExecStop=/usr/ccsp/ovsagent/OvsAgent_ovsdb-server_check.sh ovs-stop
 Restart=on-failure
