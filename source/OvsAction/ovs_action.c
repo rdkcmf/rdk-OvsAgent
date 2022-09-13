@@ -580,8 +580,9 @@ static OVS_STATUS ovs_setup_brcm_wifi_flows(Gateway_Config * req)
 
     for (idx = 0; idx < sizeof(eth_types)/sizeof(eth_types[0]); idx++)
     {
-        if (g_ovsActionConfig.oneWifiEnabled && eth_types[idx] == ETHER_TYPE_802_1X)
-        {   // If OneWifi is enabled (at compile time), do not setup 802.1X ovs flow.
+        if (((g_ovsActionConfig.oneWifiEnabled) || (g_ovsActionConfig.modelNum == OVS_SR203_MODEL)) &&
+	    (eth_types[idx] == ETHER_TYPE_802_1X))
+        {   // If OneWifi is enabled (at compile time) or device is HUB4, do not setup 802.1X ovs flow.
             OvsActionDebug("%s Skipping OVS flow for Ether Type 0x%04x\n",
                 __func__, eth_types[idx]);
             continue;
@@ -880,7 +881,8 @@ static OVS_STATUS ovs_setup_bridge_flows(Gateway_Config * req)
 
     // sets up OpenFlow flows for bridge related flows
     if ((g_ovsActionConfig.modelNum == OVS_CGM4331COM_MODEL) ||
-        (g_ovsActionConfig.modelNum == OVS_CGM4981COM_MODEL))
+        (g_ovsActionConfig.modelNum == OVS_CGM4981COM_MODEL) ||
+	(g_ovsActionConfig.modelNum == OVS_SR203_MODEL))
     {
         if ((status = ovs_setup_brcm_wifi_flows(req)) != OVS_SUCCESS_STATUS)
         {
