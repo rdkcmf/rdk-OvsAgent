@@ -842,6 +842,9 @@ TEST_F(OvsActionTestFixture, ovs_action_remove_port_from_bridge_valid)
 }
 
 // ARRISXB6-12247
+// This interface nsgmi1.100, other interface nsgmii1.101, associated
+// interface ethsw123 and parent bridge brlan0 don't exist prior.
+// Adds nsgmii100 to brlan0.
 TEST_F(OvsActionTestFixture, ovs_action_setup_eth_switch_port1_axb6)
 {
     const OVS_IF_TYPE ifType = OVS_OTHER_IF_TYPE;
@@ -854,8 +857,13 @@ TEST_F(OvsActionTestFixture, ovs_action_setup_eth_switch_port1_axb6)
     const char expectedIP[] = "10.0.0.1";
     FILE * expectedFd1 = (FILE *)0xffffffff;
     FILE * expectedFd2 = (FILE *)0xfffffffe;
+    FILE * expectedFd3 = (FILE *)0xfffffffd;
     const std::string expectedIfPath = PUMA7_ETH1_PATH;
-    const std::string expectedParentBridgeCmd = "ovs-vsctl iface-to-br " + ifName;
+    const std::string expectedOtherIfPath = PUMA7_ETH2_PATH;
+    const std::string expectedParentBridgeCmd =
+        std::string("ovs-vsctl iface-to-br ") + std::string(PUMA7_ETH1_NAME);
+    const std::string expectedOtherParentBridgeCmd =
+        std::string("ovs-vsctl iface-to-br ") + std::string(PUMA7_ETH2_NAME);
     const std::string expectedBridgePortsCmd = "ovs-vsctl list-ports " + parentBridge;
     char expectedParentBridge[] = "brlan0\n";
     char expectedBridgePorts[] = "nsgmii1.100\n";
@@ -863,7 +871,10 @@ TEST_F(OvsActionTestFixture, ovs_action_setup_eth_switch_port1_axb6)
 
     std::vector<std::string> expectedCmds;
     expectedCmds.push_back("/bin/vlan_util add_group dummy" + vlan + " " + vlan);
-    expectedCmds.push_back("/bin/vlan_util add_interface dummy" + vlan + " " + PUMA7_PORT1_NAME);
+    expectedCmds.push_back("/bin/vlan_util add_interface dummy" + vlan +
+        " " + PUMA7_PORT1_NAME);
+    expectedCmds.push_back("/bin/vlan_util add_interface dummy" + vlan +
+        " " + PUMA7_PORT2_NAME);
     expectedCmds.push_back("brctl delif dummy" + vlan + " " + ifName);
     expectedCmds.push_back("ifconfig dummy" + vlan + " down; brctl delbr dummy" + vlan);
     expectedCmds.push_back("ifconfig " + ifName + " up");
@@ -880,14 +891,20 @@ TEST_F(OvsActionTestFixture, ovs_action_setup_eth_switch_port1_axb6)
     EXPECT_CALL(*g_fileIOMock, popen(StrEq(expectedParentBridgeCmd), StrEq("r")))
        .Times(1)
        .WillOnce(::testing::Return(expectedFd1));
-    EXPECT_CALL(*g_fileIOMock, popen(StrEq(expectedBridgePortsCmd), StrEq("r")))
+    EXPECT_CALL(*g_fileIOMock, popen(StrEq(expectedOtherParentBridgeCmd), StrEq("r")))
        .Times(1)
        .WillOnce(::testing::Return(expectedFd2));
+    EXPECT_CALL(*g_fileIOMock, popen(StrEq(expectedBridgePortsCmd), StrEq("r")))
+       .Times(1)
+       .WillOnce(::testing::Return(expectedFd3));
 
     EXPECT_CALL(*g_fileIOMock, pclose(expectedFd1))
        .Times(1)
        .WillOnce(::testing::Return(0));
     EXPECT_CALL(*g_fileIOMock, pclose(expectedFd2))
+       .Times(1)
+       .WillOnce(::testing::Return(0));
+    EXPECT_CALL(*g_fileIOMock, pclose(expectedFd3))
        .Times(1)
        .WillOnce(::testing::Return(0));
 
@@ -899,6 +916,9 @@ TEST_F(OvsActionTestFixture, ovs_action_setup_eth_switch_port1_axb6)
         ))
         .WillOnce(::testing::ReturnNull());
     EXPECT_CALL(*g_fileIOMock, fgets(_, _, expectedFd2))
+        .Times(1)
+        .WillOnce(::testing::ReturnNull());
+    EXPECT_CALL(*g_fileIOMock, fgets(_, _, expectedFd3))
         .Times(2)
         .WillOnce(::testing::DoAll(
             SetArgNPointeeTo<0>(std::begin(expectedBridgePorts), sizeof(expectedBridgePorts)),
@@ -915,13 +935,21 @@ TEST_F(OvsActionTestFixture, ovs_action_setup_eth_switch_port1_axb6)
             .WillOnce(Return(1));
     }
 
+    EXPECT_CALL(*g_utilsMock, access(StrEq(ETH_BHAUL_IF_PATH), _))
+        .Times(1)
+        .WillOnce(Return(-1));
+
     EXPECT_CALL(*g_utilsMock, access(StrEq(expectedBrPath), _))
         .Times(1)
         .WillOnce(Return(-1));
 
     EXPECT_CALL(*g_utilsMock, access(StrEq(expectedIfPath), _))
         .Times(1)
-        .WillOnce(Return(0));
+        .WillOnce(Return(-1));
+
+    EXPECT_CALL(*g_utilsMock, access(StrEq(expectedOtherIfPath), _))
+        .Times(1)
+        .WillOnce(Return(-1));
 
     EXPECT_CALL(*g_utilsMock, getenv(StrEq(MODEL_NUM)))
         .Times(1)
@@ -936,6 +964,8 @@ TEST_F(OvsActionTestFixture, ovs_action_setup_eth_switch_port1_axb6)
 }
 
 // ARRISXB6-12678
+// This interface nsgmi1.101, other interface nsgmii1.100, associated
+// interface ethsw123 and parent bridge brlan1 don't exist prior.
 TEST_F(OvsActionTestFixture, ovs_action_setup_eth_switch_port2_axb6)
 {
     const OVS_IF_TYPE ifType = OVS_OTHER_IF_TYPE;
@@ -950,8 +980,11 @@ TEST_F(OvsActionTestFixture, ovs_action_setup_eth_switch_port2_axb6)
     FILE * expectedFd1 = (FILE *)0xfffffffe;
     FILE * expectedFd2 = (FILE *)0xfffffffd;
     const std::string expectedIfPath = PUMA7_ETH2_PATH;
-    const std::string expectedBrlan0BridgeCmd = "ovs-vsctl iface-to-br " + std::string(PUMA7_ETH1_NAME);
-    const std::string expectedParentBridgeCmd = "ovs-vsctl iface-to-br " + ifName;
+    const std::string expectedOtherIfPath = PUMA7_ETH1_PATH;
+    const std::string expectedParentBridgeCmd = "ovs-vsctl iface-to-br " +
+        std::string(PUMA7_ETH2_NAME);
+    const std::string expectedOtherBridgeCmd = "ovs-vsctl iface-to-br " +
+        std::string(PUMA7_ETH1_NAME);
     const std::string expectedBridgePortsCmd = "ovs-vsctl list-ports " + parentBridge;
     char expectedParentBridge[] = "brlan1\n";
     char expectedBridgePorts[] = "nsgmii1.101\n";
@@ -959,7 +992,8 @@ TEST_F(OvsActionTestFixture, ovs_action_setup_eth_switch_port2_axb6)
 
     std::vector<std::string> expectedCmds;
     expectedCmds.push_back("/bin/vlan_util add_group dummy" + vlan + " " + vlan);
-    expectedCmds.push_back("/bin/vlan_util add_interface dummy" + vlan + " " + PUMA7_PORT2_NAME);
+    expectedCmds.push_back("/bin/vlan_util add_interface dummy" + vlan +
+        " " + PUMA7_PORT2_NAME);
     expectedCmds.push_back("brctl delif dummy" + vlan + " " + ifName);
     expectedCmds.push_back("ifconfig dummy" + vlan + " down; brctl delbr dummy" + vlan);
     expectedCmds.push_back("ifconfig " + ifName + " up");
@@ -973,10 +1007,10 @@ TEST_F(OvsActionTestFixture, ovs_action_setup_eth_switch_port2_axb6)
     strcpy(cfg.if_name, const_cast<char *>(ifName.c_str()));
     strcpy(cfg.parent_bridge, const_cast<char *>(parentBridge.c_str()));
 
-    EXPECT_CALL(*g_fileIOMock, popen(StrEq(expectedBrlan0BridgeCmd), StrEq("r")))
+    EXPECT_CALL(*g_fileIOMock, popen(StrEq(expectedParentBridgeCmd), StrEq("r")))
        .Times(1)
        .WillOnce(::testing::Return(expectedFd0));
-    EXPECT_CALL(*g_fileIOMock, popen(StrEq(expectedParentBridgeCmd), StrEq("r")))
+    EXPECT_CALL(*g_fileIOMock, popen(StrEq(expectedOtherBridgeCmd), StrEq("r")))
        .Times(1)
        .WillOnce(::testing::Return(expectedFd1));
     EXPECT_CALL(*g_fileIOMock, popen(StrEq(expectedBridgePortsCmd), StrEq("r")))
@@ -994,14 +1028,14 @@ TEST_F(OvsActionTestFixture, ovs_action_setup_eth_switch_port2_axb6)
        .WillOnce(::testing::Return(0));
 
     EXPECT_CALL(*g_fileIOMock, fgets(_, _, expectedFd0))
-        .Times(1)
-        .WillOnce(::testing::ReturnNull());
-    EXPECT_CALL(*g_fileIOMock, fgets(_, _, expectedFd1))
         .Times(2)
         .WillOnce(::testing::DoAll(
             SetArgNPointeeTo<0>(std::begin(expectedParentBridge), sizeof(expectedParentBridge)),
             ::testing::Return((char*)expectedParentBridge)
         ))
+        .WillOnce(::testing::ReturnNull());
+    EXPECT_CALL(*g_fileIOMock, fgets(_, _, expectedFd1))
+        .Times(1)
         .WillOnce(::testing::ReturnNull());
     EXPECT_CALL(*g_fileIOMock, fgets(_, _, expectedFd2))
         .Times(2)
@@ -1020,13 +1054,21 @@ TEST_F(OvsActionTestFixture, ovs_action_setup_eth_switch_port2_axb6)
             .WillOnce(Return(1));
     }
 
+    EXPECT_CALL(*g_utilsMock, access(StrEq(ETH_BHAUL_IF_PATH), _))
+        .Times(1)
+        .WillOnce(Return(-1));
+
     EXPECT_CALL(*g_utilsMock, access(StrEq(expectedBrPath), _))
         .Times(1)
         .WillOnce(Return(-1));
 
     EXPECT_CALL(*g_utilsMock, access(StrEq(expectedIfPath), _))
         .Times(1)
-        .WillOnce(Return(0));
+        .WillOnce(Return(-1));
+
+    EXPECT_CALL(*g_utilsMock, access(StrEq(expectedOtherIfPath), _))
+        .Times(1)
+        .WillOnce(Return(-1));
 
     EXPECT_CALL(*g_utilsMock, getenv(StrEq(MODEL_NUM)))
         .Times(1)
@@ -1041,6 +1083,10 @@ TEST_F(OvsActionTestFixture, ovs_action_setup_eth_switch_port2_axb6)
 }
 
 // ARRISXB6-12678
+// This interface nsgmi1.101 and interface ethsw123 don't exist prior.
+// Other interface nsgmii1.100 DOES exist prior and it belongs to brlan0.
+// Covers case where nsgmii1.100 is already part of brlan0 and then a
+// request is made to add nsgmmii1.101 to brlan1.
 TEST_F(OvsActionTestFixture, ovs_action_setup_eth_switch_xhs_port2_axb6)
 {
     const OVS_IF_TYPE ifType = OVS_OTHER_IF_TYPE;
@@ -1053,7 +1099,7 @@ TEST_F(OvsActionTestFixture, ovs_action_setup_eth_switch_xhs_port2_axb6)
     FILE * expectedFd0 = (FILE *)0xffffffff;
     FILE * expectedFd1 = (FILE *)0xfffffffe;
     FILE * expectedFd2 = (FILE *)0xfffffffd;
-    const std::string expectedBrlan0PortPath = PUMA7_ETH1_PATH;
+    const std::string expectedOtherIfPath = PUMA7_ETH1_PATH;
     const std::string expectedIfPath = PUMA7_ETH2_PATH;
     const std::string expectedBrlan0BridgeCmd = "ovs-vsctl iface-to-br " + std::string(PUMA7_ETH1_NAME);
     const std::string expectedParentBridgeCmd = "ovs-vsctl iface-to-br " + ifName;
@@ -1064,6 +1110,7 @@ TEST_F(OvsActionTestFixture, ovs_action_setup_eth_switch_xhs_port2_axb6)
     char expectedModel[] = "TG3482G";
 
     std::vector<std::string> expectedCmds;
+    expectedCmds.push_back("ovs-vsctl del-port brlan0 " + std::string(PUMA7_ETH1_NAME));
     expectedCmds.push_back("/bin/vlan_util add_group dummy100 100");
     expectedCmds.push_back("/bin/vlan_util add_group dummy101 101");
     expectedCmds.push_back("/bin/vlan_util add_interface dummy100 " + std::string(PUMA7_PORT1_NAME));
@@ -1072,6 +1119,7 @@ TEST_F(OvsActionTestFixture, ovs_action_setup_eth_switch_xhs_port2_axb6)
     expectedCmds.push_back("brctl delif dummy101 " + ifName);
     expectedCmds.push_back("ifconfig dummy100 down; brctl delbr dummy100");
     expectedCmds.push_back("ifconfig dummy101 down; brctl delbr dummy101");
+    expectedCmds.push_back("ovs-vsctl add-port brlan0 " + std::string(PUMA7_ETH1_NAME));
     expectedCmds.push_back("ifconfig " + ifName + " up");
     expectedCmds.push_back("ovs-vsctl add-br " + parentBridge);
     expectedCmds.push_back("ifconfig " + parentBridge + " up");
@@ -1087,8 +1135,8 @@ TEST_F(OvsActionTestFixture, ovs_action_setup_eth_switch_xhs_port2_axb6)
        .Times(1)
        .WillOnce(::testing::Return(expectedFd0));
     EXPECT_CALL(*g_fileIOMock, popen(StrEq(expectedParentBridgeCmd), StrEq("r")))
-       .Times(1)
-       .WillOnce(::testing::Return(expectedFd1));
+       .Times(2)
+       .WillRepeatedly(::testing::Return(expectedFd1));
     EXPECT_CALL(*g_fileIOMock, popen(StrEq(expectedBridgePortsCmd), StrEq("r")))
        .Times(1)
        .WillOnce(::testing::Return(expectedFd2));
@@ -1097,8 +1145,8 @@ TEST_F(OvsActionTestFixture, ovs_action_setup_eth_switch_xhs_port2_axb6)
        .Times(1)
        .WillOnce(::testing::Return(0));
     EXPECT_CALL(*g_fileIOMock, pclose(expectedFd1))
-       .Times(1)
-       .WillOnce(::testing::Return(0));
+       .Times(2)
+       .WillRepeatedly(::testing::Return(0));
     EXPECT_CALL(*g_fileIOMock, pclose(expectedFd2))
        .Times(1)
        .WillOnce(::testing::Return(0));
@@ -1112,11 +1160,7 @@ TEST_F(OvsActionTestFixture, ovs_action_setup_eth_switch_xhs_port2_axb6)
         .WillOnce(::testing::ReturnNull());
     EXPECT_CALL(*g_fileIOMock, fgets(_, _, expectedFd1))
         .Times(2)
-        .WillOnce(::testing::DoAll(
-            SetArgNPointeeTo<0>(std::begin(expectedParentBridge), sizeof(expectedParentBridge)),
-            ::testing::Return((char*)expectedParentBridge)
-        ))
-        .WillOnce(::testing::ReturnNull());
+        .WillRepeatedly(::testing::ReturnNull());
     EXPECT_CALL(*g_fileIOMock, fgets(_, _, expectedFd2))
         .Times(2)
         .WillOnce(::testing::DoAll(
@@ -1134,15 +1178,18 @@ TEST_F(OvsActionTestFixture, ovs_action_setup_eth_switch_xhs_port2_axb6)
             .WillOnce(Return(1));
     }
 
+    EXPECT_CALL(*g_utilsMock, access(StrEq(ETH_BHAUL_IF_PATH), _))
+        .Times(1)
+        .WillOnce(Return(-1));
     EXPECT_CALL(*g_utilsMock, access(StrEq(expectedBrPath), _))
         .Times(1)
         .WillOnce(Return(-1));
-    EXPECT_CALL(*g_utilsMock, access(StrEq(expectedBrlan0PortPath), _))
-        .Times(1)
-        .WillOnce(Return(0));
+    EXPECT_CALL(*g_utilsMock, access(StrEq(expectedOtherIfPath), _))
+        .Times(2)
+        .WillRepeatedly(Return(0));
     EXPECT_CALL(*g_utilsMock, access(StrEq(expectedIfPath), _))
         .Times(1)
-        .WillOnce(Return(0));
+        .WillOnce(Return(-1));
 
     EXPECT_CALL(*g_utilsMock, getenv(StrEq(MODEL_NUM)))
         .Times(1)

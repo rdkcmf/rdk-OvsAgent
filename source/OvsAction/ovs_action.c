@@ -305,7 +305,8 @@ static OVS_STATUS ovs_setupEthSwitch(char *ifName)
             return status;
         }
 
-        // check if the interface exists and if it belongs to a parent bridge
+        // check if the interface path /sys/class/net/nsgmii1.101 exists
+        // and if it belongs to a parent bridge, restore it back
         if ((access(restorePath, F_OK) == 0) && found)
         {
             status = setupAndRestoreEthSwitchCmds(ifName, ifPath, ifVlan,
@@ -332,7 +333,8 @@ static OVS_STATUS ovs_setupEthSwitch(char *ifName)
             return status;
         }
 
-        // check if the interface exists and if it belongs to a parent bridge
+        // check if the interface path /sys/class/net/nsgmii1.100 exists
+        // and if it belongs to a parent bridge, restore it back
         if ((access(restorePath, F_OK) == 0) && found)
         {
             status = setupAndRestoreEthSwitchCmds(ifName, ifPath, ifVlan,
@@ -1055,7 +1057,8 @@ static OVS_STATUS ovs_createVlan(Gateway_Config * req)
     {
         if (g_ovsActionConfig.modelNum == OVS_TG3482G_MODEL)
         {
-            snprintf(cmd, 250, "  ip link add link %s %s type vlan proto 802.1Q id %d", req->parent_ifname, req->if_name, req->vlan_id);
+            snprintf(cmd, 250, "  ip link add link %s %s type vlan proto 802.1Q id %d",
+                req->parent_ifname, req->if_name, req->vlan_id);
             OvsActionInfo("%s Cmd: %s\n", __func__, cmd);
             system(cmd);
         }
